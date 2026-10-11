@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>晨报 · 今日头条</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f7f3ec'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23a8321e' font-family='serif' font-weight='700'%3E报%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============ 设计令牌：编辑部/杂志排版风 ============ */
+:root{
+  /* 纸感底色：暖白，向品牌暖色偏移，绝不用纯白 */
+  --paper:        oklch(97.5% 0.006 85);
+  --paper-sunk:   oklch(94.5% 0.010 82);
+  --paper-raised: oklch(99.2% 0.004 88);
+  /* 墨色：暖黑，绝不用纯黑 */
+  --ink:          oklch(23% 0.015 55);
+  --ink-soft:     oklch(46% 0.014 60);
+  --ink-faint:    oklch(63% 0.012 68);
+  --ink-ghost:    oklch(80% 0.010 75);
+  /* 朱红：全场唯一强调色，占比控制在 10% */
+  --vermilion:    oklch(52% 0.185 28);
+  --vermilion-deep: oklch(43% 0.17 28);
+  --vermilion-wash: oklch(95% 0.028 30);
+  /* 发丝线 */
+  --rule:         oklch(87% 0.010 80);
+  --rule-strong:  oklch(74% 0.014 78);
+  /* 语义色：向纸色偏移，避免灰字死板 */
+  --success:      oklch(48% 0.11 155);
+  --danger:       oklch(50% 0.16 25);
+  --info:         oklch(48% 0.10 245);
+
+  /* 4pt 间距体系 */
+  --sp-1:4px;  --sp-2:8px;  --sp-3:12px; --sp-4:16px;
+  --sp-5:24px; --sp-6:32px; --sp-7:48px; --sp-8:64px; --sp-9:96px;
+
+  --serif: "Noto Serif SC", "Songti SC", "SimSun", Georgia, serif;
+  --sans:  "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+
+  /* 动效令牌：统一缓动，绝不用 bounce */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in:  cubic-bezier(0.7, 0, 0.84, 0);
+  --t-fast: 140ms; --t-base: 260ms; --t-slow: 420ms;
+
+  /* 层级 */
+  --z-header: 200; --z-dropdown: 300; --z-toast: 500;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:        oklch(17% 0.010 60);
+    --paper-sunk:   oklch(21% 0.012 58);
+    --paper-raised: oklch(24% 0.014 56);
+    --ink:          oklch(92% 0.010 80);
+    --ink-soft:     oklch(74% 0.012 76);
+    --ink-faint:    oklch(58% 0.012 72);
+    --ink-ghost:    oklch(38% 0.012 70);
+    --vermilion:    oklch(64% 0.175 32);
+    --vermilion-deep: oklch(72% 0.15 34);
+    --vermilion-wash: oklch(27% 0.045 28);
+    --rule:         oklch(31% 0.012 60);
+    --rule-strong:  oklch(42% 0.014 60);
+    --success:      oklch(66% 0.12 155);
+    --danger:       oklch(66% 0.15 28);
+    --info:         oklch(66% 0.10 245);
+  }
+}
+
+*,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+
+html{ -webkit-text-size-adjust:100%; }
+
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--serif);
+  font-size:1rem;
+  line-height:1.7;
+  font-kerning:normal;
+  /* 暗色下提高行高，轻字重需要更多呼吸 */
+  padding-bottom:env(safe-area-inset-bottom);
+  -webkit-font-smoothing:antialiased;
+}
+
+@media (prefers-color-scheme: dark){ body{ line-height:1.78; } }
+
+/* 数字等宽对齐 */
+.num, .meta, time, .stat-num{ font-variant-numeric:tabular-nums; }
+
+button, input, textarea, select{ font:inherit; color:inherit; }
+button{ background:none; border:none; cursor:pointer; }
+a{ color:inherit; text-decoration:none; }
+img{ max-width:100%; display:block; }
+
+/* 键盘可达：仅键盘用户显示焦点环 */
+:focus-visible{
+  outline:2px solid var(--vermilion);
+  outline-offset:3px;
+  border-radius:1px;
+}
+:focus:not(:focus-visible){ outline:none; }
+
+.skip{
+  position:absolute; left:var(--sp-4); top:-100px; z-index:999;
+  background:var(--ink); color:var(--paper); padding:var(--sp-2) var(--sp-4);
+  transition:top var(--t-base) var(--ease-out);
+}
+.skip:focus{ top:var(--sp-4); }
+
+/* ============ 报头 ============ */
+.masthead{
+  border-bottom:3px double var(--rule-strong);
+  padding-bottom:var(--sp-4);
+}
+.masthead__top{
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:var(--sp-4); flex-wrap:wrap;
+  padding-bottom:var(--sp-2);
+  border-bottom:1px solid var(--rule);
+  margin-bottom:var(--sp-3);
+}
+.masthead__date{ font-family:var(--sans); font-size:.75rem; color:var(--ink-faint); letter-spacing:.04em; }
+.masthead__brand{
+  font-size:clamp(2.2rem, 8vw, 3.6rem);
+  font-weight:900; line-height:.95; letter-spacing:-.02em;
+  text-align:center; flex:1;
+}
+.masthead__brand em{ font-style:normal; color:var(--vermilion); }
+/* 竖排装饰线，印刷感 */
+.masthead__tagline{
+  text-align:center; font-family:var(--sans);
+  font-size:.72rem; letter-spacing:.32em; color:var(--ink-faint);
+  text-transform:uppercase; margin-top:var(--sp-1);
+}
+.masthead__actions{ display:flex; gap:var(--sp-3); align-items:center; }
+
+/* ============ 分类导航：报纸栏目条============ */
+.nav{
+  position:sticky; top:0; z-index:var(--z-header);
+  background:var(--paper);
+  border-bottom:1px solid var(--rule);
+  display:flex; gap:0; overflow-x:auto; scrollbar-width:none;
+}
+.nav::-webkit-scrollbar{ display:none; }
+.nav__item{
+  padding:var(--sp-3) var(--sp-4); white-space:nowrap;
+  font-family:var(--sans); font-size:.875rem; font-weight:500;
+  color:var(--ink-soft); position:relative;
+  transition:color var(--t-fast) var(--ease-out);
+}
+.nav__item:hover{ color:var(--ink); }
+.nav__item[aria-current="page"]{ color:var(--vermilion); font-weight:700; }
+/* 下划线用transform 动画，不用 layout 属性 */
+.nav__item[aria-current="page"]::after{
+  content:''; position:absolute; left:var(--sp-4); right:var(--sp-4); bottom:-1px;
+  height:2px; background:var(--vermilion);
+  animation:navIn var(--t-base) var(--ease-out);
+}
+@keyframes navIn{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+
+.shell{ max-width:1180px; margin:0 auto; padding:0 var(--sp-5) var(--sp-9); }
+
+/* ============ 主体：非对称布局 ============ */
+.layout{ display:grid; gap:var(--sp-7); padding-top:var(--sp-6); }
+@media (min-width:1024px){ .layout{ grid-template-columns:minmax(0,1fr) 296px; align-items:start; } }
+
+.section-head{
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:var(--sp-4); flex-wrap:wrap;
+  border-bottom:1px solid var(--ink); padding-bottom:var(--sp-2);
+  margin-bottom:var(--sp-5);
+}
+.section-head__title{
+  font-size:1.5rem; font-weight:700; letter-spacing:.02em;
+  display:flex; align-items:baseline; gap:var(--sp-3);
+}
+/* 栏目序号：朱红数字，印刷品的标记 */
+.section-head__num{
+  font-family:var(--sans); font-size:.875rem; font-weight:700;
+  color:var(--vermilion); letter-spacing:.08em;
+}
+.section-head__aside{ font-family:var(--sans); font-size:.8125rem; color:var(--ink-faint); }
+
+/* ============ 头条（大号，非对称）============ */
+.lead{
+  display:grid; gap:var(--sp-5); padding-bottom:var(--sp-6);
+  border-bottom:1px solid var(--rule);
+  margin-bottom:var(--sp-6);
+}
+@media (min-width:768px){ .lead{ grid-template-columns:1.15fr 1fr; gap:var(--sp-7); align-items:start; } }
+.lead__media{ order:2; }
+@media (min-width:768px){ .lead__media{ order:1; } }
+.lead__body{ order:1; }
+@media (min-width:768px){ .lead__body{ order:2; } }
+.lead__title{
+  font-size:clamp(1.75rem, 4.6vw, 2.6rem);
+  font-weight:900; line-height:1.18; letter-spacing:-.015em;
+  margin-bottom:var(--sp-3);
+}
+.lead__title a{ background-image:linear-gradient(var(--vermilion),var(--vermilion));
+  background-size:0 2px; background-repeat:no-repeat; background-position:0 100%;
+  transition:background-size var(--t-base) var(--ease-out); }
+.lead__title a:hover{ background-size:100% 2px; }
+.lead__excerpt{
+  font-size:1.0625rem; color:var(--ink-soft); line-height:1.75;
+  max-width:60ch; margin-bottom:var(--sp-4);
+}
+.lead__figure{ margin:0; }
+.lead__figure img{
+  width:100%; aspect-ratio:16/10; object-fit:cover;
+  border:1px solid var(--rule);
+}
+/* 无图时的排版占位：不是灰色方块，而是报纸式的空白框+标签 */
+.lead__figure--empty{
+  aspect-ratio:16/10; border:1px solid var(--rule);
+  background:
+    repeating-linear-gradient(45deg, transparent, transparent 9px,
+      var(--rule) 9px, var(--rule) 10px);
+  display:grid; place-items:center;
+}
+.lead__figure--empty span{ font-family:var(--sans); font-size:.75rem; color:var(--ink-ghost); letter-spacing:.2em; }
+.caption{ font-family:var(--sans); font-size:.75rem; color:var(--ink-faint); margin-top:var(--sp-2); }
+
+/* ============ 新闻条目：细线分隔，不用卡片 ============ */
+.feed{ display:flex; flex-direction:column; }
+.entry{
+  display:grid; gap:var(--sp-2) var(--sp-5);
+  padding:var(--sp-5) 0; border-bottom:1px solid var(--rule);
+  animation:rise var(--t-slow) var(--ease-out) both;
+  animation-delay:calc(var(--i,0) * 45ms);
+}
+@keyframes rise{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
+@media (min-width:640px){ .entry{ grid-template-columns:1fr 148px; align-items:start; } }
+.entry__thumb{ order:2; }
+@media (min-width:640px){ .entry__thumb{ order:2; } }
+.entry__main{ order:1; min-width:0; }
+.entry__title{
+  font-size:1.1875rem; font-weight:700; line-height:1.42; letter-spacing:-.005em;
+  margin-bottom:var(--sp-2);
+}
+.entry__title a::after{ content:''; position:absolute; inset:0; }
+.entry__title a:hover{ color:var(--vermilion); }
+.entry{ position:relative; }
+.entry__excerpt{
+  font-size:.9375rem; color:var(--ink-soft); line-height:1.68;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.entry__thumb img{
+  width:100%; aspect-ratio:4/3; object-fit:cover; border:1px solid var(--rule);
+  transition:transform var(--t-slow) var(--ease-out);
+}
+@media (hover:hover){ .entry:hover .entry__thumb img{ transform:scale(1.03); } }
+.thumb--empty{
+  aspect-ratio:4/3; border:1px solid var(--rule); background:var(--paper-sunk);
+  display:grid; place-items:center; font-family:var(--sans);
+  font-size:.6875rem; color:var(--ink-ghost); letter-spacing:.14em;
+}
+
+/* ============ 元信息 ============ */
+.meta{
+  display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-1) var(--sp-3);
+  font-family:var(--sans); font-size:.75rem; color:var(--ink-faint);
+  margin-top:var(--sp-3);
+}
+.meta__dot{ color:var(--ink-ghost); }
+.meta__cat{ color:var(--vermilion); font-weight:500; }
+
+/* ============ 侧栏 ============ */
+.aside{ display:flex; flex-direction:column; gap:var(--sp-6); }
+@media (min-width:1024px){ .aside{ position:sticky; top:76px; } }
+.widget{ border-top:3px solid var(--ink); padding-top:var(--sp-3); }
+.widget__title{
+  font-family:var(--sans); font-size:.75rem; font-weight:700;
+  letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ink-soft); margin-bottom:var(--sp-4);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.mini{ display:flex; gap:var(--sp-3); padding:var(--sp-3) 0; border-bottom:1px solid var(--rule); }
+.mini:last-child{ border-bottom:none; }
+.mini__rank{
+  font-family:var(--sans); font-size:.9375rem; font-weight:900;
+  color:var(--ink-ghost); line-height:1; min-width:1.4em; font-variant-numeric:tabular-nums;
+}
+.mini:nth-child(-n+3) .mini__rank{ color:var(--vermilion); }
+.mini__title{ font-size:.9375rem; font-weight:500; line-height:1.5; }
+.mini__title:hover{ color:var(--vermilion); }
+
+/* ============ 按钮：主/次/幽灵 三级 ============ */
+.btn{
+  font-family:var(--sans); font-size:.875rem; font-weight:500;
+  padding:var(--sp-2) var(--sp-4); min-height:38px;
+  border:1px solid var(--ink); border-radius:2px;
+  transition:background var(--t-fast) var(--ease-out),
+             color var(--t-fast) var(--ease-out),
+             border-color var(--t-fast) var(--ease-out),
+             transform var(--t-fast) var(--ease-out);
+}
+.btn:hover{ background:var(--ink); color:var(--paper); }
+.btn:active{ transform:translateY(1px); }
+.btn--primary{ background:var(--vermilion); border-color:var(--vermilion); color:oklch(99% 0 0); }
+.btn--primary:hover{ background:var(--vermilion-deep); border-color:var(--vermilion-deep); color:oklch(99% 0 0); }
+.btn--ghost{ border-color:transparent; color:var(--ink-soft); padding-inline:var(--sp-2); }
+.btn--ghost:hover{ background:var(--paper-sunk); color:var(--ink); border-color:transparent; }
+.btn--danger{ border-color:var(--danger); color:var(--danger); }
+.btn--danger:hover{ background:var(--danger); color:oklch(99% 0 0); }
+.btn[disabled]{ opacity:.45; pointer-events:none; }
+.btn--sm{ font-size:.8125rem; padding:var(--sp-1) var(--sp-3); min-height:32px; }
+
+/* 图标按钮：视觉小，触控区44px */
+.icon-btn{
+  width:32px; height:32px; display:grid; place-items:center;
+  border:1px solid var(--rule); border-radius:2px; color:var(--ink-soft);
+  position:relative; transition:color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.icon-btn::before{ content:''; position:absolute; inset:-6px; }/* 扩到44px */
+.icon-btn:hover{ color:var(--vermilion); border-color:var(--vermilion); }
+.icon-btn[aria-pressed="true"]{ color:var(--vermilion); border-color:var(--vermilion); background:var(--vermilion-wash); }
+.icon-btn svg{ width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+
+/* ============ 分页 ============ */
+.pager{
+  display:flex; align-items:center; justify-content:center; gap:var(--sp-4);
+  padding-top:var(--sp-6); font-family:var(--sans);
+}
+.pager__info{ font-size:.8125rem; color:var(--ink-faint); font-variant-numeric:tabular-nums; }
+
+/* ============ 详情页 ============ */
+.article{ max-width:70ch; margin:0 auto; padding-top:var(--sp-6); }
+.article__back{
+  font-family:var(--sans); font-size:.8125rem; color:var(--ink-faint);
+  display:inline-flex; align-items:center; gap:var(--sp-2);
+  margin-bottom:var(--sp-5);
+}
+.article__back:hover{ color:var(--vermilion); }
+.article__title{
+  font-size:clamp(1.9rem, 5.4vw, 3rem); font-weight:900;
+  line-height:1.16; letter-spacing:-.02em; margin-bottom:var(--sp-4);
+}
+.article__figure{ margin:var(--sp-6) 0; }
+.article__figure img{ width:100%; border:1px solid var(--rule); }
+.article__figure--empty{
+  aspect-ratio:21/9; border:1px solid var(--rule);
+  background:repeating-linear-gradient(45deg,transparent,transparent 9px,var(--rule) 9px,var(--rule) 10px);
+  display:grid; place-items:center; font-family:var(--sans); font-size:.75rem; color:var(--ink-ghost); letter-spacing:.2em;
+}
+/* 正文：首字下沉，报纸质感 */
+.article__body{ font-size:1.0625rem; line-height:1.95; color:var(--ink); }
+.article__body > p{ margin-bottom:var(--sp-5); }
+.article__body > p:first-of-type::first-letter{
+  float:left; font-size:3.6em; line-height:.82; font-weight:900;
+  color:var(--vermilion); margin:.06em .12em 0 0;
+}
+.article__actions{
+  display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+  padding:var(--sp-4) 0; margin:var(--sp-6) 0;
+}
+.article__actions .spacer{ flex:1; }
+
+.related{ margin-top:var(--sp-8); border-top:3px solid var(--ink); padding-top:var(--sp-4); }
+.related__title{ font-family:var(--sans); font-size:.75rem; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:var(--sp-3); }
+.related__item{ padding:var(--sp-3) 0; border-bottom:1px solid var(--rule); display:flex; gap:var(--sp-4); align-items:baseline; }
+.related__item:last-child{ border-bottom:none; }
+.related__idx{ font-family:var(--sans); font-size:.8125rem; font-weight:900; color:var(--vermilion); font-variant-numeric:tabular-nums; }
+.related__text{ font-size:.9375rem; font-weight:500; line-height:1.55; }
+.related__item:hover .related__text{ color:var(--vermilion); }
+
+/* ============ 认证页 ============ */
+.auth{ max-width:400px; margin:0 auto; padding-top:var(--sp-8); }
+.auth__title{ font-size:2rem; font-weight:900; letter-spacing:-.01em; }
+.auth__sub{ font-family:var(--sans); font-size:.875rem; color:var(--ink-faint); margin-top:var(--sp-2); }
+.field{ margin-top:var(--sp-5); }
+.field__label{
+  display:block; font-family:var(--sans); font-size:.8125rem; font-weight:500;
+  color:var(--ink-soft); margin-bottom:var(--sp-2);
+}
+.field__input{
+  width:100%; padding:var(--sp-3); background:var(--paper-raised);
+  border:1px solid var(--rule-strong); border-radius:2px;
+  transition:border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+  font-family:var(--sans); font-size:.9375rem;
+}
+.field__input:hover{ border-color:var(--ink-faint); }
+.field__input:focus{ border-color:var(--vermilion); background:var(--paper-raised); outline:none; }
+.field__input::placeholder{ color:var(--ink-ghost); }
+.field__input[aria-invalid="true"]{ border-color:var(--danger); }
+.field__err{ font-family:var(--sans); font-size:.75rem; color:var(--danger); margin-top:var(--sp-1); min-height:1.2em; }
+.auth__switch{ font-family:var(--sans); font-size:.8125rem; color:var(--ink-faint); margin-top:var(--sp-5); }
+.auth__switch button{ color:var(--vermilion); text-decoration:underline; text-underline-offset:3px; }
+
+/* ============ 账户页 ============ */
+.account{ max-width:620px; margin:0 auto; padding-top:var(--sp-7); }
+.account__head{ display:flex; align-items:center; gap:var(--sp-4); margin-bottom:var(--sp-6); }
+.avatar{
+  width:64px; height:64px; border-radius:50%; object-fit:cover;
+  border:2px solid var(--ink); background:var(--paper-sunk); flex-shrink:0;
+}
+.tabs{ display:flex; gap:var(--sp-5); border-bottom:1px solid var(--ink); margin-bottom:var(--sp-6); }
+.tab{
+  font-family:var(--sans); font-size:.9375rem; font-weight:500; color:var(--ink-faint);
+  padding-bottom:var(--sp-2); position:relative;
+}
+.tab[aria-selected="true"]{ color:var(--ink); font-weight:700; }
+.tab[aria-selected="true"]::after{
+  content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--vermilion);
+}
+
+/* ============ 空状态 / 骨架屏 ============ */
+.empty{
+  text-align:center; padding:var(--sp-8) var(--sp-4); color:var(--ink-faint);
+  border:1px dashed var(--rule-strong); border-radius:2px;
+}
+.empty__mark{ font-size:2.5rem; line-height:1; color:var(--ink-ghost); margin-bottom:var(--sp-3); }
+.empty__title{ font-size:1.0625rem; font-weight:700; color:var(--ink-soft); margin-bottom:var(--sp-2); }
+.empty__text{ font-family:var(--sans); font-size:.875rem; max-width:42ch; margin:0 auto var(--sp-4); }
+
+.skeleton{ display:flex; flex-direction:column; gap:var(--sp-5); }
+.sk{ background:linear-gradient(90deg,var(--paper-sunk) 25%,var(--rule) 50%,var(--paper-sunk) 75%);
+  background-size:200% 100%; animation:shimmer 1.4s linear infinite; border-radius:2px; }
+@keyframes shimmer{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
+.sk--title{ height:1.5rem; width:70%; }
+.sk--line{ height:.875rem; }
+.sk--media{ aspect-ratio:16/9; }
+
+/* ============ Toast ============ */
+.toasts{
+  position:fixed; z-index:var(--z-toast); bottom:var(--sp-5); left:50%;
+  transform:translateX(-50%); display:flex; flex-direction:column-reverse; gap:var(--sp-2);
+  width:min(92vw,420px);
+}
+.toast{
+  display:flex; align-items:flex-start; gap:var(--sp-3);
+  background:var(--ink); color:var(--paper);
+  padding:var(--sp-3) var(--sp-4); border-radius:2px;
+  font-family:var(--sans); font-size:.875rem; line-height:1.5;
+  border-left:3px solid var(--ink-ghost);
+  animation:toastIn var(--t-base) var(--ease-out);
+}
+.toast--success{ border-left-color:var(--success); }
+.toast--error{ border-left-color:var(--danger); }
+.toast--info{ border-left-color:var(--info); }
+.toast.is-leaving{ animation:toastOut var(--t-fast) var(--ease-in) forwards; }
+@keyframes toastIn{ from{ opacity:0; transform:translateY(12px) scale(.98); } to{ opacity:1; transform:none; } }
+@keyframes toastOut{ to{ opacity:0; transform:translateY(8px); } }
+
+/* ============ 移动端底部导航 ============ */
+.tabbar{ display:none; }
+@media (max-width:1023px){
+  .tabbar{
+    display:grid; grid-template-columns:repeat(4,1fr);
+    position:fixed; bottom:0; left:0; right:0; z-index:var(--z-header);
+    background:var(--paper-raised); border-top:1px solid var(--rule);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tabbar__btn{
+    font-family:var(--sans); font-size:.6875rem; color:var(--ink-faint);
+    padding:var(--sp-2) var(--sp-1); min-height:56px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    transition:color var(--t-fast) var(--ease-out);
+  }
+  .tabbar__btn svg{ width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .tabbar__btn[aria-current="page"]{ color:var(--vermilion); }
+  .tabbar__btn[aria-current="page"] .tabbar__dot{ opacity:1; transform:none; }
+  .tabbar__dot{ width:3px; height:3px; border-radius:50%; background:currentColor; opacity:0; transform:scale(.4); transition:opacity var(--t-fast), transform var(--t-fast); }
+  .shell{ padding-bottom:96px; }
+  .masthead__brand{ text-align:left; }
+}
+
+.view{ display:none; }
+.view.is-active{ display:block; animation:fade var(--t-base) var(--ease-out); }
+@keyframes fade{ from{ opacity:0; } to{ opacity:1; } }
+
+/* 动效降级：保留功能反馈，去掉空间位移 */
+/* 图片加载失败时降级为排版占位，避免出现破图 */
+img[data-fallback]:not([data-loaded="1"]){
+  background:var(--paper-sunk);
+  min-height:100%;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important; animation-iteration-count:1 !important;
+    transition-duration:.01ms !important; scroll-behavior:auto !important;
+  }
+  .entry{ animation:none; }
+  .sk{ animation:none; background:var(--paper-sunk); }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+
+<div class="shell">
+  <!-- ============ 报头 ============ -->
+  <header class="masthead">
+    <div class="masthead__top">
+      <span class="masthead__date" id="today">—</span>
+      <div class="masthead__actions" id="authSlot"></div>
+    </div>
+    <h1 class="masthead__brand">晨<em>报</em></h1>
+    <p class="masthead__tagline">Daily Digest · 今日头条</p>
+  </header>
+
+  <!-- ============ 分类导航 ============ -->
+  <nav class="nav" id="cats" aria-label="新闻分类"></nav>
+
+  <main id="main">
+    <!-- 列表视图 -->
+    <section class="view" id="v-list" aria-labelledby="listTitle">
+      <div class="layout">
+        <div>
+          <div class="section-head">
+            <h2 class="section-head__title" id="listTitle">
+              <span class="section-head__num" id="listNum">01</span>
+              <span id="listLabel">要闻</span>
+            </h2>
+            <span class="section-head__aside" id="listCount">—</span>
+          </div>
+          <div id="listBody"></div>
+          <div class="pager" id="pager"></div>
+        </div>
+        <aside class="aside" id="aside"></aside>
+      </div>
+    </section>
+
+    <!-- 详情视图 -->
+    <section class="view" id="v-detail">
+      <article class="article" id="article"></article>
+    </section>
+
+    <!-- 收藏 / 历史共用列表容器 -->
+    <section class="view" id="v-collection">
+      <div class="section-head">
+        <h2 class="section-head__title" id="colTitle">
+          <span class="section-head__num" id="colNum">★</span><span id="colLabel">我的收藏</span>
+        </h2>
+        <span class="section-head__aside" id="colCount">—</span>
+      </div>
+      <div id="colBody"></div>
+      <div class="pager" id="colPager"></div>
+    </section>
+
+    <!-- 认证视图 -->
+    <section class="view" id="v-auth">
+      <div class="auth" id="authBox"></div>
+    </section>
+
+    <!-- 账户视图 -->
+    <section class="view" id="v-account">
+      <div class="account" id="accountBox"></div>
+    </section>
+  </main>
+</div>
+
+<!-- 移动端底部导航 -->
+<nav class="tabbar" id="tabbar" aria-label="主要导航"></nav>
+
+<!-- Toast 容器 -->
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   配置
+   ============================================================ */
+const API = "http://127.0.0.1:8000/api";
+const TOKEN_KEY = "toutiao_token";
+const PAGE_SIZE = 10;
+
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+const getToken = () => sessionStorage.getItem(TOKEN_KEY) || "";
+const setToken = t => t ? sessionStorage.setItem(TOKEN_KEY, t) : sessionStorage.removeItem(TOKEN_KEY);
+
+/* ============================================================
+   API 封装：统一处理 {code,message,data} 与鉴权头
+   ============================================================ */
+class ApiError extends Error {
+  constructor(message, code, status){ super(message); this.code = code; this.status = status; }
+}
+
+async function request(path, { method = "GET", body, query } = {}) {
+  const url = new URL(API + path);
+  if (query) {
+    for (const [k, v] of Object.entries(query)) {
+      if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
+    }
+  }
+
+  const headers = {};
+  const token = getToken();
+  // 后端 auth.py 做了 authorization.split()[1]，值必须含空格
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+  } catch {
+    // fetch 失败 = 网络层不通，不是接口报错
+    throw new ApiError("无法连接到服务器，请确认后端已启动并检查网络", 0, 0);
+  }
+
+  let json;
+  try { json = await res.json(); }
+  catch { throw new ApiError(`服务器返回了无法解析的内容（HTTP ${res.status}）`, res.status, res.status); }
+
+  if (json.code === 200) return json.data;
+
+  const err = new ApiError(json.message || "请求失败，请稍后重试", json.code, res.status);
+  // 401 表示令牌失效，立即清理登录态
+  if (res.status === 401) {
+    setToken("");
+    state.user = null;
+    renderAuthSlot();
+  }
+  throw err;
+}
+
+const api = {
+  categories:  ()            => request("/news/categories"),
+  newsList:    q             => request("/news/list", { query: q }),
+  newsDetail:  id            => request("/news/detail", { query: { id } }),
+  login:       b             => request("/users/login",  { method: "POST", body: b }),
+  register:    b             => request("/users/register",{ method: "POST", body: b }),
+  userInfo:    ()            => request("/users/info"),
+  updateUser:  b             => request("/users/update",{ method: "PUT", body: b }),
+  changePwd:   b             => request("/users/password",{ method: "PUT", body: b }),
+  favCheck:    newsId        => request("/favorite/check",{ query: { newsId } }),
+  favAdd:      newsId        => request("/favorite/add",   { method: "POST", body: { newsId } }),
+  favRemove:   newsId        => request("/favorite/remove",{ method: "DELETE", query: { newsId } }),
+  favList:     q             => request("/favorite/list",  { query: q }),
+  favClear:    ()            => request("/favorite/clear", { method: "DELETE" }),
+  historyAdd:  newsId        => request("/history/add",    { method: "POST", body: { newsId } }),
+  historyList: q             => request("/history/list",   { query: q }),
+  historyDel:  id            => request(`/history/delete/${id}`, { method: "DELETE" }),
+  historyClear:()            => request("/history/clear",  { method: "DELETE" })
+};
+
+/* ============================================================
+   字段归一化
+   后端存在两种命名：新闻列表用下划线，收藏/历史/详情用驼峰别名。
+   渲染前统一成驼峰，避免各视图到处做兼容判断。
+   ============================================================ */
+function normalizeNews(raw = {}) {
+  return {
+    id:          raw.id,
+    title:       raw.title ?? "（无标题）",
+    description: raw.description ?? "",
+    content:     raw.content ?? "",
+    image:       raw.image || null,
+    author:      raw.author || "匿名",
+    categoryId:  raw.categoryId ?? raw.category_id ?? null,
+    views:       raw.views ?? 0,
+    publishTime: raw.publishTime ?? raw.publish_time ?? null,
+    // 收藏/历史列表的附加字段
+    favoriteId:  raw.favoriteId ?? raw.favorite_id ?? null,
+    favoriteTime:raw.favoriteTime ?? raw.favorite_time ?? null,
+    historyId:   raw.historyId ?? raw.history_id ?? null,
+    historyTime: raw.historyTime ?? raw.history_time ?? null
+  };
+}
+
+/* ============================================================
+   全局状态
+   ============================================================ */
+const state = {
+  view: "list",
+  categories: [],
+  categoryId: null,
+  categoryName: "要闻",
+  page: 1,
+  total: 0,
+  hasMore: false,
+  listCache: [],          // 用于侧栏"热门"复用，避免重复请求
+  user: null,
+  favIds: new Set(),      // 已收藏的新闻 id，用于列表/详情即时标记
+  collection: { kind: "favorite", page: 1, total: 0 },
+  authMode: "login",
+  accountTab: "profile",
+  loading: false
+};
+
+/* ============================================================
+   工具
+   ============================================================ */
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => (
+    { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]
+  ));
+}
+
+function fmtDate(iso, withTime = true) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16);
+  const p = n => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return withTime ? `${date} ${p(d.getHours())}:${p(d.getMinutes())}` : date;
+}
+
+function fmtRelative(iso) {
+  if (!iso) return "";
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (Number.isNaN(diff)) return "";
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} 天前`;
+  return fmtDate(iso, false);
+}
+
+function toast(message, kind = "info", ms = 3200) {
+  const el = document.createElement("div");
+  el.className = `toast toast--${kind}`;
+  el.textContent = message;
+  $("#toasts").append(el);
+  setTimeout(() => {
+    el.classList.add("is-leaving");
+    el.addEventListener("animationend", () => el.remove(), { once: true });
+  }, ms);
+}
+
+/* ============================================================
+   骨架屏 / 空状态
+   ============================================================ */
+function skeletonList(n = 4) {
+  return `<div class="skeleton">${Array.from({ length: n }, (_, i) => `
+    <div>
+      <div class="sk sk--title" style="width:${[78,64,86,70][i % 4]}%"></div>
+      <div class="sk sk--line" style="margin-top:12px"></div>
+      <div class="sk sk--line" style="width:58%;margin-top:8px"></div>
+    </div>`).join("")}</div>`;
+}
+
+function emptyState({ title, text, action }) {
+  return `<div class="empty">
+    <div class="empty__mark" aria-hidden="true">◇</div>
+    <p class="empty__title">${esc(title)}</p>
+    <p class="empty__text">${esc(text)}</p>
+    ${action || ""}
+  </div>`;
+}
+
+function requireLogin(msg = "登录后即可使用该功能") {
+  toast(msg, "info");
+  go("auth");
+  return false;
+}
+
+/* ============================================================
+   导航
+   ============================================================ */
+function switchView(name) {
+  $$(".view").forEach(v => v.classList.toggle("is-active", v.id === `v-${name}`));
+  state.view = name;
+  syncNav();
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+function syncNav() {
+  $$(".nav__item").forEach(b => {
+    if (b.dataset.view === state.view && b.dataset.view !== "list") b.removeAttribute("aria-current");
+  });
+  const map = { list: "cat", favorite: "fav", history: "his", account: "me" };
+  const target = map[state.view];
+  $$(".tabbar__btn").forEach(b => b.toggleAttribute("aria-current", b.dataset.view === target));
+}
+
+function go(view, opts = {}) {
+  switchView(view);
+  if (view === "list") loadNews(opts.page || 1);
+  if (view === "detail") loadDetail(opts.id);
+  if (view === "favorite" || view === "history") loadCollection(view, opts.page || 1);
+  if (view === "auth") renderAuth();
+  if (view === "account") renderAccount();
+}
+
+function renderCategories() {
+  // 后端 /api/news/list 的 categoryId 为必填，没有"全部分类"聚合接口，
+  // 因此不渲染会导致误导的"全部"标签，直接列出真实分类
+  $("#cats").innerHTML = state.categories.map(c => `
+    <button class="nav__item" data-cat="${c.id}"
+      ${c.id === state.categoryId ? 'aria-current="page"' : ""}
+    >${esc(c.name)}</button>`).join("");
+}
+
+function renderTabbar() {
+  const items = [
+    { view: "list", label: "要闻", icon: '<path d="M4 5h16M4 10h16M4 15h10M4 20h7"/>' },
+    { view: "favorite", label: "收藏", icon: '<path d="M6 3h12v18l-6-5-6 5z"/>' },
+    { view: "history", label: "历史", icon: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v5l3 2"/>' },
+    { view: "account", label: "我的", icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>' }
+  ];
+  $("#tabbar").innerHTML = items.map(i => `
+    <button class="tabbar__btn" data-view="${i.view}">
+      <svg viewBox="0 0 24 24" aria-hidden="true">${i.icon}</svg>
+      <span>${i.label}</span><span class="tabbar__dot"></span>
+    </button>`).join("");
+}
+
+/* ============================================================
+   渲染：新闻列表
+   ============================================================ */
+function entryHTML(n, i, opts = {}) {
+  const fav = state.favIds.has(n.id);
+  const time = opts.time || fmtDate(n.publishTime);
+  const cat = state.categories.find(c => c.id === n.categoryId);
+
+  return `<article class="entry" style="--i:${i}">
+    <div class="entry__main">
+      <h3 class="entry__title"><a href="#/detail/${n.id}">${esc(n.title)}</a></h3>
+      <p class="entry__excerpt">${esc(n.description || n.content || "暂无摘要")}</p>
+      <div class="meta">
+        ${cat ? `<span class="meta__cat">${esc(cat.name)}</span><span class="meta__dot">·</span>` : ""}
+        <span>${esc(n.author)}</span>
+        <span class="meta__dot">·</span>
+        <time datetime="${esc(n.publishTime || "")}">${esc(time)}</time>
+        ${opts.extraMeta ? `<span class="meta__dot">·</span>${opts.extraMeta}` : ""}
+      </div>
+    </div>
+    <div class="entry__thumb">
+      ${n.image
+        ? `<img src="${esc(n.image)}" alt="${esc(n.title)}" loading="lazy" referrerpolicy="no-referrer">`
+        : `<div class="thumb--empty">暂无图片</div>`}
+    </div>
+  </article>`;
+}
+
+function renderList() {
+  const items = state.listCache;
+  const [lead, ...rest] = items;
+
+  if (!items.length) {
+    $("#listBody").innerHTML = emptyState({
+      title: "该分类下暂无新闻",
+      text: "换个分类看看，或稍后再来——编辑部可能还在赶稿。",
+      action: state.categories.length > 1
+        ? `<button class="btn btn--sm" data-cat="${state.categories.find(c => c.id !== state.categoryId)?.id}">看看其他分类</button>`
+        : ""
+    });
+    return;
+  }
+
+  const cat = state.categories.find(c => c.id === lead.categoryId);
+  let html = `<article class="lead">
+    <div class="lead__body">
+      <h2 class="lead__title"><a href="#/detail/${lead.id}">${esc(lead.title)}</a></h2>
+      <p class="lead__excerpt">${esc(lead.description || lead.content || "")}</p>
+      <div class="meta">
+        ${cat ? `<span class="meta__cat">${esc(cat.name)}</span><span class="meta__dot">·</span>` : ""}
+        <span>${esc(lead.author)}</span><span class="meta__dot">·</span>
+        <time datetime="${esc(lead.publishTime || "")}">${esc(fmtDate(lead.publishTime))}</time>
+        <span class="meta__dot">·</span><span>${lead.views} 次阅读</span>
+      </div>
+      <div class="article__actions" style="border:0;padding:var(--sp-3) 0 0;margin:0">
+        ${favBtn(lead.id)}
+        <a class="btn btn--ghost btn--sm" href="#/detail/${lead.id}">阅读全文</a>
+      </div>
+    </div>
+    <figure class="lead__media lead__figure">
+      ${lead.image
+        ? `<img src="${esc(lead.image)}" alt="${esc(lead.title)}" referrerpolicy="no-referrer">`
+        : `<div class="lead__figure--empty"><span>NO IMAGE</span></div>`}
+      ${lead.image ? `<figcaption class="caption">图 / ${esc(lead.author)}</figcaption>` : ""}
+    </figure>
+  </article>`;
+
+  if (rest.length) {
+    html += `<div class="feed">${rest.map((n, i) => entryHTML(n, i, {})).join("")}</div>`;
+  }
+  $("#listBody").innerHTML = html;
+}
+
+function favBtn(id, label = "收藏") {
+  const on = state.favIds.has(id);
+  return `<button class="btn btn--sm ${on ? "" : "btn--primary"}" data-fav="${id}"
+    aria-pressed="${on}">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="${on ? "currentColor" : "none"}"
+      stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="display:inline-block;vertical-align:-2px;margin-right:5px">
+      <path d="M6 3h12v18l-6-5-6 5z"/></svg>${on ? "已收藏" : label}
+  </button>`;
+}
+
+function renderAside() {
+  const hot = state.listCache.slice(0, 5);
+  const catList = state.categories.map(c => ({ id: c.id, name: c.name }));
+
+  $("#aside").innerHTML = `
+    <section class="widget">
+      <h3 class="widget__title"><span>本期热读</span><span>TOP 5</span></h3>
+      ${hot.length
+        ? hot.map((n, i) => `<a class="mini" href="#/detail/${n.id}">
+            <span class="mini__rank num">${String(i + 1).padStart(2, "0")}</span>
+            <span class="mini__title">${esc(n.title)}</span>
+          </a>`).join("")
+        : `<p class="meta">暂无数据</p>`}
+    </section>
+    <section class="widget">
+      <h3 class="widget__title"><span>全部栏目</span><span>${catList.length}</span></h3>
+      <div style="display:flex;flex-wrap:wrap;gap:var(--sp-2)">
+        ${catList.map(c => `<button class="btn btn--sm btn--ghost" data-cat="${c.id}">${esc(c.name)}</button>`).join("")
+          || `<p class="meta">暂无分类</p>`}
+      </div>
+    </section>`;
+}
+
+function renderPager() {
+  const p = state.page, total = state.total, size = PAGE_SIZE;
+  const maxPage = Math.max(1, Math.ceil(total / size));
+  $("#pager").innerHTML = `
+    <button class="btn btn--sm" data-page="${p - 1}" ${p <= 1 ? "disabled" : ""}>上一页</button>
+    <span class="pager__info">第 <span class="num">${p}</span> / ${maxPage} 页 · 共 ${total} 条</span>
+    <button class="btn btn--sm" data-page="${p + 1}" ${!state.hasMore ? "disabled" : ""}>下一页</button>`;
+}
+
+/* ============================================================
+   数据加载：新闻列表
+   ============================================================ */
+async function loadCategories() {
+  try {
+    const data = await api.categories();
+    state.categories = (data || []).map(c => ({ id: c.id, name: c.name }));
+    renderCategories();
+  } catch (e) {
+    state.categories = [];
+    renderCategories();
+    toast(e.message, "error");
+  }
+}
+
+async function loadNews(page = 1) {
+  // categoryId 是后端必填参数，尚未选择时默认取第一个分类
+  if (state.categoryId == null) {
+    if (!state.categories.length) await loadCategories();
+    if (!state.categories.length) {
+      $("#listBody").innerHTML = emptyState({
+        title: "还没有可浏览的分类",
+        text: "请先在数据库中创建新闻分类数据，再刷新页面。"
+      });
+      return;
+    }
+    state.categoryId = state.categories[0].id;
+  }
+
+  state.page = page;
+  state.loading = true;
+  $("#listBody").innerHTML = skeletonList(4);
+  $("#pager").innerHTML = "";
+  $("#listLabel").textContent =
+    state.categories.find(c => c.id === state.categoryId)?.name || "要闻";
+  $("#listNum").textContent = "01";
+
+  try {
+    const data = await api.newsList({ categoryId: state.categoryId, page, pageSize: PAGE_SIZE });
+    state.listCache = (data?.list || []).map(normalizeNews);
+    state.total = data?.total ?? 0;
+    state.hasMore = !!data?.hasMore;
+
+    $("#listCount").textContent = state.total ? `共 ${state.total} 条` : "";
+    renderList();
+    renderAside();
+    renderPager();
+    renderCategories();
+  } catch (e) {
+    state.listCache = [];
+    $("#listBody").innerHTML = emptyState({
+      title: "新闻加载失败",
+      text: e.message,
+      action: `<button class="btn btn--sm" data-act="retry-news">重新加载</button>`
+    });
+    $("#listCount").textContent = "";
+  } finally {
+    state.loading = false;
+  }
+}
+
+/* ============================================================
+   详情页
+   ============================================================ */
+async function loadDetail(id) {
+  $("#article").innerHTML = skeletonList(2);
+  try {
+    const data = await api.newsDetail(id);
+    const n = normalizeNews(data);
+    const cat = state.categories.find(c => c.id === n.categoryId);
+    const fav = state.favIds.has(n.id);
+
+    $("#article").innerHTML = `
+      <a class="article__back" href="#/">← 返回列表</a>
+      <h1 class="article__title">${esc(n.title)}</h1>
+      <div class="meta" style="margin-top:0;margin-bottom:var(--sp-5);padding-bottom:var(--sp-4);border-bottom:1px solid var(--rule)">
+        ${cat ? `<span class="meta__cat">${esc(cat.name)}</span><span class="meta__dot">·</span>` : ""}
+        <span>${esc(n.author)}</span><span class="meta__dot">·</span>
+        <time datetime="${esc(n.publishTime || "")}">${esc(fmtDate(n.publishTime))}</time>
+        <span class="meta__dot">·</span><span class="num">${n.views}</span> 次阅读
+      </div>
+
+      ${n.image
+        ? `<figure class="article__figure"><img src="${esc(n.image)}" alt="${esc(n.title)}" referrerpolicy="no-referrer">
+             <figcaption class="caption">图 / ${esc(n.author)}</figcaption></figure>`
+        : `<figure class="article__figure"><div class="article__figure--empty"><span>NO IMAGE</span></div></figure>`}
+
+      <div class="article__body">
+        ${(n.content || n.description || "（暂无正文内容）")
+          .split(/\n{2,}|\n/).filter(Boolean)
+          .map(p => `<p>${esc(p)}</p>`).join("")}
+      </div>
+
+      <div class="article__actions">
+        ${favBtn(n.id)}
+        <span class="spacer"></span>
+        <span class="meta" style="margin:0">阅读量 <span class="num">${n.views}</span></span>
+      </div>
+
+      ${(data.relatedNews || []).length ? `
+        <section class="related">
+          <h2 class="related__title">相关推荐</h2>
+          ${data.relatedNews.map((r, i) => {
+            const rn = normalizeNews(r);
+            return `<a class="related__item" href="#/detail/${rn.id}">
+              <span class="related__idx">${String(i + 1).padStart(2, "0")}</span>
+              <span class="related__text">${esc(rn.title)}</span>
+            </a>`;
+          }).join("")}
+        </section>` : ""}`;
+
+    // 已登录则静默记录浏览历史
+    if (getToken()) {
+      api.historyAdd(n.id).catch(() => {});
+    }
+  } catch (e) {
+    $("#article").innerHTML = `
+      <a class="article__back" href="#/">← 返回列表</a>
+      ${emptyState({
+        title: e.status === 404 ? "这条新闻不存在" : "新闻加载失败",
+        text: e.message,
+        action: `<a class="btn btn--sm" href="#/">返回列表</a>`
+      })}`;
+  }
+}
+
+/* ============================================================
+   收藏 / 浏览历史
+   ============================================================ */
+async function loadCollection(kind, page = 1) {
+  const isFav = kind === "favorite";
+  if (isFav && !getToken()) return requireLogin("登录后查看我的收藏");
+
+  state.collection = { kind, page, total: 0 };
+  $("#colNum").textContent = isFav ? "★" : "◷";
+  $("#colLabel").textContent = isFav ? "我的收藏" : "浏览历史";
+  $("#colTitle").setAttribute("aria-label", isFav ? "我的收藏" : "浏览历史");
+  $("#colBody").innerHTML = skeletonList(3);
+  $("#colPager").innerHTML = "";
+
+  try {
+    const data = isFav
+      ? await api.favList({ page, pageSize: PAGE_SIZE })
+      : await api.historyList({ page, pageSize: PAGE_SIZE });
+
+    const rows = (data?.list || []).map(normalizeNews);
+    state.collection.total = data?.total ?? 0;
+    $("#colCount").textContent = state.collection.total ? `共 ${state.collection.total} 条` : "";
+
+    if (!rows.length) {
+      $("#colBody").innerHTML = emptyState({
+        title: isFav ? "还没有收藏任何新闻" : "还没有浏览记录",
+        text: isFav
+          ? "在新闻列表或详情页点击「收藏」，就能把感兴趣的内容留在这里，方便下次回来阅读。"
+          : "你读过的新闻会自动出现在这里，方便回顾。需要隐私时，可以一键清空。",
+        action: isFav
+          ? `<a class="btn btn--sm" href="#/">去逛逛要闻</a>`
+          : `<div style="display:flex;gap:var(--sp-2);justify-content:center">
+               <a class="btn btn--sm" href="#/">去逛逛要闻</a>
+             </div>`
+      });
+    } else {
+      const extra = isFav
+        ? `<span>收藏于 ${esc(fmtDate(rows[0].favoriteTime, false))}</span>`
+        : `<span>${esc(fmtRelative(rows[0].historyTime))}读过</span>`;
+
+      $("#colBody").innerHTML = `<div class="feed">
+        ${rows.map((n, i) => `
+          <article class="entry" style="--i:${i}">
+            <div class="entry__main">
+              <h3 class="entry__title"><a href="#/detail/${n.id}">${esc(n.title)}</a></h3>
+              <p class="entry__excerpt">${esc(n.description || n.content || "暂无摘要")}</p>
+              <div class="meta">
+                <span>${esc(n.author)}</span><span class="meta__dot">·</span>
+                <time>${esc(fmtDate(n.publishTime, false))}</time>
+                <span class="meta__dot">·</span>
+                ${isFav
+                  ? `<span>收藏于 ${esc(fmtDate(n.favoriteTime, false))}</span>`
+                  : `<span>${esc(fmtRelative(n.historyTime))}读过</span>`}
+              </div>
+              <div style="display:flex;gap:var(--sp-2);margin-top:var(--sp-3)">
+                ${isFav
+                  ? `<button class="btn btn--sm" data-fav="${n.id}" aria-pressed="true">
+                       <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" style="display:inline-block;vertical-align:-2px;margin-right:5px" aria-hidden="true"><path d="M6 3h12v18l-6-5-6 5z"/></svg>已收藏</button>`
+                  : `<button class="btn btn--sm btn--danger" data-hist-del="${n.historyId}">删除这条记录</button>`}
+              </div>
+            </div>
+            <div class="entry__thumb">
+              ${n.image
+                ? `<img src="${esc(n.image)}" alt="${esc(n.title)}" loading="lazy" referrerpolicy="no-referrer">`
+                : `<div class="thumb--empty">暂无图片</div>`}
+            </div>
+          </article>`).join("")}
+      </div>`;
+    }
+
+    // 分页
+    const maxPage = Math.max(1, Math.ceil(state.collection.total / PAGE_SIZE));
+    const p = page;
+    $("#colPager").innerHTML = state.collection.total ? `
+      <button class="btn btn--sm" data-col-page="${p - 1}" data-kind="${kind}" ${p <= 1 ? "disabled" : ""}>上一页</button>
+      <span class="pager__info">第 <span class="num">${p}</span> / ${maxPage} 页</span>
+      <button class="btn btn--sm" data-col-page="${p + 1}" data-kind="${kind}" ${p >= maxPage ? "disabled" : ""}>下一页</button>` : "";
+  } catch (e) {
+    $("#colBody").innerHTML = emptyState({
+      title: "加载失败",
+      text: e.message,
+      action: `<button class="btn btn--sm" data-act="retry-col">重新加载</button>`
+    });
+  }
+}
+
+/* ============================================================
+   收藏操作（乐观更新）
+   ============================================================ */
+async function toggleFav(id) {
+  if (!getToken()) return requireLogin("登录后才能收藏新闻");
+
+  const wasFav = state.favIds.has(id);
+  // 乐观更新：先改 UI，失败再回滚
+  wasFav ? state.favIds.delete(id) : state.favIds.add(id);
+  repaintFavButtons(id);
+
+  try {
+    wasFav ? await api.favRemove(id) : await api.favAdd(id);
+    toast(wasFav ? "已取消收藏" : "已加入收藏", "success", 1800);
+    if (state.view === "favorite") loadCollection("favorite", state.collection.page);
+  } catch (e) {
+    // 回滚
+    wasFav ? state.favIds.add(id) : state.favIds.delete(id);
+    repaintFavButtons(id);
+    toast(e.message, "error");
+  }
+}
+
+function repaintFavButtons(id) {
+  $$(`[data-fav="${id}"]`).forEach(btn => {
+    const on = state.favIds.has(id);
+    btn.setAttribute("aria-pressed", String(on));
+    btn.classList.toggle("btn--primary", !on);
+    // 收藏列表里的按钮语义是"取消收藏"
+    const isCollection = state.view === "favorite";
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13"
+      fill="${on ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"
+      aria-hidden="true" style="display:inline-block;vertical-align:-2px;margin-right:5px">
+      <path d="M6 3h12v18l-6-5-6 5z"/></svg>${on ? (isCollection ? "已收藏" : "已收藏") : "收藏"}`;
+  });
+}
+
+async function refreshFavIds() {
+  if (!getToken()) return;
+  // 逐个检查代价高，改为在列表/收藏页加载时顺带标记
+  try {
+    const data = await api.favList({ page: 1, pageSize: 100 });
+    state.favIds = new Set((data?.list || []).map(n => n.id));
+  } catch { /* 未登录或网络异常时忽略 */ }
+}
+
+/* ============================================================
+   认证页
+   ============================================================ */
+function renderAuth() {
+  const login = state.authMode === "login";
+  $("#authBox").innerHTML = `
+    <h2 class="auth__title">${login ? "登录" : "注册"}</h2>
+    <p class="auth__sub">${login ? "登录后可收藏新闻并同步浏览记录" : "创建账号，开始你的阅读收藏"}</p>
+    <form id="authForm" novalidate>
+      <div class="field">
+        <label class="field__label" for="f-user">用户名</label>
+        <input class="field__input" id="f-user" name="username" autocomplete="username"
+          placeholder="请输入用户名" required aria-describedby="e-user">
+        <p class="field__err" id="e-user" role="alert"></p>
+      </div>
+      <div class="field">
+        <label class="field__label" for="f-pwd">密码</label>
+        <input class="field__input" id="f-pwd" name="password" type="password"
+          autocomplete="${login ? "current-password" : "new-password"}"
+          placeholder="请输入密码" required aria-describedby="e-pwd">
+        <p class="field__err" id="e-pwd" role="alert"></p>
+      </div>
+      <div class="field">
+        <button class="btn btn--primary" type="submit" style="width:100%" data-role="submit">
+          ${login ? "登录" : "创建账号"}
+        </button>
+      </div>
+    </form>
+    <p class="auth__switch">
+      ${login ? "还没有账号？" : "已经有账号了？"}
+      <button data-act="toggle-auth">${login ? "立即注册" : "去登录"}</button>
+    </p>`;
+}
+
+async function submitAuth(form) {
+  const username = form.username.value.trim();
+  const password = form.password.value;
+  const btn = $('[data-role="submit"]', form);
+
+  const setErr = (field, msg) => {
+    $(`#e-${field}`).textContent = msg;
+    $(`#f-${field}`).setAttribute("aria-invalid", msg ? "true" : "false");
+  };
+  setErr("user", ""); setErr("pwd", "");
+
+  // 失焦校验，而不是每次按键都报错
+  if (!username) { setErr("user", "请输入用户名"); $("#f-user").focus(); return; }
+  if (!password) { setErr("pwd", "请输入密码"); $("#f-pwd").focus(); return; }
+  if (!state.authMode === "login" === false && password.length < 6) {
+    setErr("pwd", "密码至少需要 6 位"); $("#f-pwd").focus(); return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = state.authMode === "login" ? "登录中…" : "创建中…";
+  try {
+    const data = state.authMode === "login"
+      ? await api.login({ username, password })
+      : await api.register({ username, password });
+
+    setToken(data.token);
+    state.user = data.userInfo || null;
+    renderAuthSlot();
+    toast(state.authMode === "login" ? "登录成功" : "注册成功", "success");
+    await refreshFavIds();
+    go(state.user ? "account" : "list");
+  } catch (e) {
+    // 后端错误语义：用户名已存在 / 用户名或密码错误
+    const field = /用户名/.test(e.message) ? "user" : "pwd";
+    setErr(field, e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = state.authMode === "login" ? "登录" : "创建账号";
+  }
+}
+
+/* ============================================================
+   账户页
+   ============================================================ */
+async function renderAccount() {
+  if (!getToken()) {
+    $("#accountBox").innerHTML = emptyState({
+      title: "还未登录",
+      text: "登录后可以同步收藏、浏览历史，并管理个人资料。",
+      action: `<button class="btn btn--primary btn--sm" data-act="go-auth">去登录</button>`
+    });
+    return;
+  }
+
+  $("#accountBox").innerHTML = skeletonList(2);
+  try {
+    const u = await api.userInfo();
+    state.user = u;
+    const tab = state.accountTab;
+
+    $("#accountBox").innerHTML = `
+      <div class="account__head">
+        <img class="avatar" src="${esc(u.avatar || "")}" alt=""
+          onerror="this.style.visibility='hidden'">
+        <div>
+          <h2 style="font-size:1.5rem;font-weight:900">${esc(u.nickname || u.username)}</h2>
+          <p class="meta" style="margin-top:var(--sp-1)">@${esc(u.username)}</p>
+        </div>
+        <button class="btn btn--sm btn--ghost" data-act="logout" style="margin-left:auto">退出</button>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="profile" aria-selected="${tab === "profile"}">个人资料</button>
+        <button class="tab" role="tab" data-tab="password" aria-selected="${tab === "password"}">修改密码</button>
+      </div>
+
+      ${tab === "password" ? passwordForm() : profileForm(u)}`;
+  } catch (e) {
+    $("#accountBox").innerHTML = emptyState({
+      title: "账户信息加载失败",
+      text: e.message,
+      action: `<button class="btn btn--sm" data-act="retry-account">重新加载</button>`
+    });
+  }
+}
+
+function profileForm(u) {
+  const g = { male: "男", female: "女", unknown: "保密" }[u.gender] || "保密";
+  return `<form id="profileForm" novalidate>
+    <div class="field">
+      <label class="field__label" for="p-nick">昵称</label>
+      <input class="field__input" id="p-nick" name="nickname" maxlength="50" value="${esc(u.nickname || "")}" placeholder="给自己起个名字">
+    </div>
+    <div class="field">
+      <label class="field__label" for="p-avatar">头像地址</label>
+      <input class="field__input" id="p-avatar" name="avatar" maxlength="255" value="${esc(u.avatar || "")}" placeholder="https://…">
+      <p class="field__err" role="alert"></p>
+    </div>
+    <div class="field">
+      <label class="field__label" for="p-gender">性别</label>
+      <select class="field__input" id="p-gender" name="gender">
+        ${["male", "female", "unknown"].map(v =>
+          `<option value="${v}" ${u.gender === v ? "selected" : ""}>${g === "保密" && v === "unknown" ? "保密" : ({male:"男",female:"女",unknown:"保密"})[v]}</option>`
+        ).join("")}
+      </select>
+    </div>
+    <div class="field">
+      <label class="field__label" for="p-phone">手机号</label>
+      <input class="field__input" id="p-phone" name="phone" maxlength="20" value="${esc(u.phone || "")}" placeholder="选填">
+    </div>
+    <div class="field">
+      <label class="field__label" for="p-bio">个人简介</label>
+      <input class="field__input" id="p-bio" name="bio" maxlength="500" value="${esc(u.bio || "")}" placeholder="说点什么">
+    </div>
+    <div class="field">
+      <button class="btn btn--primary" type="submit">保存资料</button>
+    </div>
+  </form>`;
+}
+
+function passwordForm() {
+  return `<form id="pwdForm" novalidate>
+    <div class="field">
+      <label class="field__label" for="p-old">当前密码</label>
+      <input class="field__input" id="p-old" name="old_password" type="password"
+        autocomplete="current-password" placeholder="请输入当前密码" aria-describedby="e-old">
+      <p class="field__err" id="e-old" role="alert"></p>
+    </div>
+    <div class="field">
+      <label class="field__label" for="p-new">新密码</label>
+      <input class="field__input" id="p-new" name="new_password" type="password"
+        autocomplete="new-password" placeholder="至少 6 位" aria-describedby="e-new">
+      <p class="field__err" id="e-new" role="alert"></p>
+    </div>
+    <div class="field">
+      <button class="btn btn--primary" type="submit">更新密码</button>
+    </div>
+  </form>`;
+}
+
+/* ============================================================
+   顶栏登录态
+   ============================================================ */
+function renderAuthSlot() {
+  const slot = $("#authSlot");
+  if (state.user) {
+    slot.innerHTML = `<button class="btn btn--sm btn--ghost" data-view="account">
+      ${esc(state.user.nickname || state.user.username)}</button>`;
+  } else {
+    slot.innerHTML = `<button class="btn btn--sm" data-view="auth">登录</button>`;
+  }
+}
+
+/* ============================================================
+   事件绑定（统一委托）
+   ============================================================ */
+document.addEventListener("click", async e => {
+  const t = e.target;
+
+  // 分类
+  const catBtn = t.closest("[data-cat]");
+  if (catBtn) {
+    state.categoryId = Number(catBtn.dataset.cat);
+    go("list", { page: 1 });
+    return;
+  }
+
+  // 收藏切换
+  const favBtnEl = t.closest("[data-fav]");
+  if (favBtnEl) { toggleFav(Number(favBtnEl.dataset.fav)); return; }
+
+  // 分页
+  const pg = t.closest("[data-page]");
+  if (pg && !pg.disabled) { loadNews(Number(pg.dataset.page)); return; }
+
+  const cpg = t.closest("[data-col-page]");
+  if (cpg && !cpg.disabled) {
+    loadCollection(cpg.dataset.kind, Number(cpg.dataset.colPage)); return;
+  }
+
+  // 删除单条历史
+  const hd = t.closest("[data-hist-del]");
+  if (hd) {
+    const id = hd.dataset.histDel;
+    if (!id) { toast("这条记录缺少标识，无法单独删除", "error"); return; }
+    hd.disabled = true;
+    try {
+      await api.historyDel(id);
+      toast("已删除这条浏览记录", "success", 1800);
+      loadCollection("history", state.collection.page);
+    } catch (err) {
+      hd.disabled = false;
+      toast(err.message, "error");
+    }
+    return;
+  }
+
+  // 视图切换
+  const navBtn = t.closest("[data-view]");
+  if (navBtn) { go(navBtn.dataset.view); return; }
+
+  // 账户 tab
+  const tabBtn = t.closest("[data-tab]");
+  if (tabBtn) { state.accountTab = tabBtn.dataset.tab; renderAccount(); return; }
+
+  // 命名动作
+  const act = t.closest("[data-act]")?.dataset.act;
+  if (act === "toggle-auth") {
+    state.authMode = state.authMode === "login" ? "register" : "login";
+    renderAuth(); return;
+  }
+  if (act === "go-auth") { go("auth"); return; }
+  if (act === "logout") {
+    setToken(""); state.user = null; state.favIds.clear();
+    renderAuthSlot(); toast("已退出登录", "success");
+    go("list"); return;
+  }
+  if (act === "retry-news") { loadNews(state.page); return; }
+  if (act === "retry-col") { loadCollection(state.collection.kind, state.collection.page); return; }
+  if (act === "retry-account") { renderAccount(); return; }
+  if (act === "clear-history") {
+    if (!confirm("确定清空全部浏览记录吗？此操作不可撤销。")) return;
+    try { const r = await api.historyClear(); loadCollection("history", 1); }
+    catch (err) { toast(err.message, "error"); }
+    return;
+  }
+  if (act === "clear-fav") {
+    if (!confirm("确定取消全部收藏吗？此操作不可撤销。")) return;
+    try { await api.favClear(); state.favIds.clear(); toast("已清空收藏", "success"); loadCollection("favorite", 1); }
+    catch (err) { toast(err.message, "error"); }
+    return;
+  }
+});
+
+// 表单提交
+document.addEventListener("submit", async e => {
+  const f = e.target;
+
+  if (f.id === "authForm") {
+    e.preventDefault();
+    submitAuth(f); return;
+  }
+
+  if (f.id === "profileForm") {
+    e.preventDefault();
+    const btn = $('button[type="submit"]', f);
+    btn.disabled = true; btn.textContent = "保存中…";
+    try {
+      await api.updateUser({
+        nickname: f.nickname.value.trim(),
+        avatar: f.avatar.value.trim(),
+        gender: f.gender.value,
+        bio: f.bio.value.trim(),
+        phone: f.phone.value.trim()
+      });
+      state.user = await api.userInfo();
+      renderAuthSlot();
+      toast("资料已保存", "success");
+      renderAccount();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "保存资料";
+    }
+    return;
+  }
+
+  if (f.id === "pwdForm") {
+    e.preventDefault();
+    const oldPwd = f.old_password.value, newPwd = f.new_password.value;
+    const eo = $("#e-old"), en = $("#e-new");
+    eo.textContent = ""; en.textContent = "";
+    if (!oldPwd) { eo.textContent = "请输入当前密码"; return; }
+    if (!newPwd) { en.textContent = "请输入新密码"; return; }
+    if (newPwd.length < 6) { en.textContent = "新密码至少需要 6 位"; return; }
+
+    const btn = $('button[type="submit"]', f);
+    btn.disabled = true; btn.textContent = "更新中…";
+    try {
+      await api.changePwd({ old_password: oldPwd, new_password: newPwd });
+      toast("密码已更新，下次登录请使用新密码", "success");
+      f.reset();
+    } catch (err) {
+      (/密码/.test(err.message) ? eo : en).textContent = err.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "更新密码";
+    }
+  }
+});
+
+// 失焦校验
+document.addEventListener("blur", e => {
+  const f = e.target.closest("form");
+  if (!f) return;
+  if (f.id === "authForm" && e.target.name === "username" && !e.target.value.trim()) {
+    $("#e-user").textContent = "请输入用户名";
+  }
+  if (f.id === "authForm" && e.target.name === "password" && !e.target.value) {
+    $("#e-pwd").textContent = "请输入密码";
+  }
+}, true);
+
+/* ============================================================
+   图片降级：外链图片加载失败时替换为排版占位块
+   ============================================================ */
+document.addEventListener("error", e => {
+  const img = e.target;
+  if (img.tagName !== "IMG" || img.dataset.fallbackApplied) return;
+  img.dataset.fallbackApplied = "1";
+  // 用同级占位样式替换，避免显示浏览器默认的破图图标
+  const ph = document.createElement("div");
+  ph.className = img.className.includes("avatar") ? "avatar" : "thumb--empty";
+  ph.style.cssText = getComputedStyle(img).cssText;
+  ph.style.aspectRatio = img.style.aspectRatio || "auto";
+  ph.style.height = img.style.height || "";
+  ph.textContent = img.className.includes("avatar") ? "" : "图片加载失败";
+  img.replaceWith(ph);
+}, true);
+
+/* ============================================================
+   运行环境检测
+   file:// 协议下浏览器 Origin 为 null，会被后端 CORS 拦截，
+   页面拿不到任何数据。与其显示"暂无数据"误导用户，不如直接说明原因。
+   ============================================================ */
+const IS_FILE_PROTOCOL = location.protocol === "file:";
+
+function showFileProtocolHint() {
+  $("#cats").innerHTML = "";
+  $("#listBody").innerHTML = emptyState({
+    title: "请通过后端地址打开本页",
+    text: "直接双击 HTML 文件（file:// 协议）时，浏览器会拦截跨源请求，页面无法读取后端数据。请在项目根目录执行 uvicorn main:app --port 8000，然后访问 http://127.0.0.1:8000/ 。",
+    action: `<button class="btn btn--primary btn--sm" onclick="location.href='http://127.0.0.1:8000/'">打开 http://127.0.0.1:8000/</button>`
+  });
+  $("#listCount").textContent = "";
+  $("#listLabel").textContent = "无法连接";
+  $("#listNum").textContent = "!";
+  $("#pager").innerHTML = "";
+  $("#aside").innerHTML = "";
+}
+
+/* ============================================================
+   路由
+   ============================================================ */
+function route() {
+  const hash = location.hash.replace(/^#\/?/, "");
+  const [seg, arg] = hash.split("/");
+
+  if (seg === "detail" && arg) { switchView("detail"); loadDetail(Number(arg)); return; }
+  if (seg === "favorite") { go("favorite"); return; }
+  if (seg === "history") { go("history"); return; }
+  if (seg === "account") { go("account"); return; }
+  if (seg === "auth") { go("auth"); return; }
+  go("list");
+}
+window.addEventListener("hashchange", route);
+
+/* ============================================================
+   启动
+   ============================================================ */
+(async function init() {
+  $("#today").textContent = fmtDate(new Date().toISOString(), false);
+  renderTabbar();
+
+  // file:// 打开时必然连不上后端，直接给出可执行的提示
+  if (IS_FILE_PROTOCOL) {
+    showFileProtocolHint();
+    return;
+  }
+
+  await loadCategories();
+  if (getToken()) {
+    try {
+      state.user = await api.userInfo();
+    } catch { setToken(""); }
+  }
+  renderAuthSlot();
+  await refreshFavIds();
+  route();
+})();
+</script>
+</body>
+</html>
