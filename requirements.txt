@@ -1,0 +1,21 @@
+# Web 框架
+fastapi==0.142.1
+uvicorn==0.54.0
+starlette==1.7.0
+pydantic==2.13.5
+
+# 数据库
+SQLAlchemy==2.1.1
+aiomysql==0.3.2
+greenlet==3.5.6
+
+# 缓存
+redis==8.1.0
+
+# 密码哈希（passlib 1.7.4 官方已不再维护 3.x 的 bcrypt 封装，
+# 实际底层实现由 bcrypt 4.0.1 提供，两个都要装）
+passlib==1.7.4
+bcrypt==4.0.1
+
+# 测试用（写接口测试时需要 TestClient）
+httpx==0.28.1
