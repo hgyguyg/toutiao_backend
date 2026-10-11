@@ -152,7 +152,3 @@ uvicorn main:app --reload
 - `config/db_conf.py` 中数据库密码为硬编码，仅适用于本地开发。对外分享前请改用环境变量注入（见下方）。
 - 新闻列表接口返回下划线命名字段（`category_id`、`publish_time`），而收藏/历史/详情接口返回驼峰别名，前后端需要分别处理。
 - 后端无"全部分类"聚合接口，前端不渲染"全部"标签。
-
-## 安全建议
-
-若需将本项目公开到 GitHub，请先把 `config/db_conf.py` 的密码改为从环境变量读取，并确保 `.env` 已被 `.gitignore` 排除。
