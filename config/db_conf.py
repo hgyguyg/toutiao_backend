@@ -1,8 +1,10 @@
+import os
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 #本地开发用的数据库密码占位符，请改成你自己的密码后运行。
 #注意：真实密码切勿提交到公开仓库。
-SQL_PASSWORD = "xxx"
+SQL_PASSWORD = os.getenv("DATABASE_PASSWORD")
 DATABASE_URL = f"mysql+aiomysql://root:{SQL_PASSWORD}@localhost:3306/news_app?charset=utf8mb4"
 
 async_engine = create_async_engine(
