@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from routers import news, users, favorite,history
+from routers import news, users, favorite, history, qa
 from utils.exception_handler import register_exception_handler
 
 app = FastAPI()
@@ -27,6 +27,7 @@ app.include_router(news.router)
 app.include_router(users.router)
 app.include_router(favorite.router)
 app.include_router(history.router)
+app.include_router(qa.router)
 
 #把前端页面挂到根路径，直接访问 http://127.0.0.1:8000/ 即可使用。
 #这样页面与接口同源，不受 CORS 限制，也不用再单独起一个静态服务器。
