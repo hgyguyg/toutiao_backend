@@ -17,21 +17,25 @@ redis==8.1.0
 passlib==1.7.4
 bcrypt==4.0.1
 
-# 测试用（写接口测试时需要 TestClient）
+# 测试用（写接口测试时需要 TestClient）；同时被 utils/search.py 用于 Bing RSS
 httpx==0.28.1
 
 # 检索 / 向量
+# chromadb 自带 onnxruntime、numpy 等较重的依赖，仅问答模块需要
 chromadb==1.5.9
 rank-bm25==0.2.2
 jieba==0.42.1
 
-# LangGraph
+# LangGraph（问答工作流 + 会话持久化）
 langgraph==1.2.18
 langgraph-checkpoint-sqlite==3.1.3
 
-# LLM / 嵌入 / 重排 / 搜索
+# LLM / 嵌入 / 重排 / 联网搜索
+# 全部走 OpenAI 兼容协议，用原生 openai SDK 而非 LangChain 封装
 openai==3.40.0
 ddgs==9.16.1
 
-# .env 加载
+# 项目代码里没有 load_dotenv() 调用，但它是 chromadb 的硬依赖链：
+# chromadb → pydantic-settings → python-dotenv，缺了它 import main 会 ModuleNotFoundError。
+# 显式钉住版本，避免上游升级时被动漂移。
 python-dotenv==1.2.4
