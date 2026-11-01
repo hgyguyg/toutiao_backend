@@ -7,6 +7,9 @@ from utils.state import QAState
 _checkpointer = None
 graph = None
 
+def get_checkpointer():
+    return _checkpointer
+
 def build_graph(checkpointer = None):
     graph = StateGraph(QAState)
 
