@@ -4,7 +4,7 @@ from fastapi.sse import EventSourceResponse
 from schemas.qa import AskRequest
 from utils.response import success_response
 from utils.retriever import HybridRetriever
-from utils.graph import _checkpointer
+from utils.graph import get_checkpointer
 
 router = APIRouter(prefix="/api/qa", tags=["qa"])
 @router.get("/health")
@@ -15,7 +15,7 @@ async def health_check():
         {
             "index_ready": retriever.ready,
             "chunks": retriever.count,
-            "memory": _checkpointer is not None,
+            "memory": get_checkpointer() is not None,
         }
     )
 @router.post("/ask")
