@@ -1,3 +1,4 @@
+import asyncio
 import json
 import threading
 
@@ -7,6 +8,7 @@ from rank_bm25 import BM25Okapi
 
 from config.qa_conf import BM25_FILE, CHROMA_DIR
 from utils.embeddings import embed_question
+from utils.rerank import rerank_documents
 
 COLLECTION_NAME = "news_chunks"
 
@@ -56,7 +58,20 @@ class HybridRetriever:
             return []
         lexical = self._lexical(question)
         vector = await self._vector(question)
-        return self._rrf(lexical, vector)
+
+        candidates = self._rrf(lexical, vector)
+
+        if not candidates:
+            return []
+
+        docs = [f"{c['text']}" for c in candidates]
+
+        try:
+            ordered = await rerank_documents(question,docs)
+            reranked = [candidates[r["index"]] for r in ordered]
+            return reranked if reranked else candidates[:5]
+        except Exception as e:
+            return candidates[:5]
 
     def _lexical(self,question:str):
         if self._bm25 is None:
@@ -73,9 +88,8 @@ class HybridRetriever:
         if self._collection is None:
             return []
         embedding = await embed_question(question)
-        result = self._collection.query(
-            query_embeddings=embedding,
-            n_results=20,
+        result = await asyncio.to_thread(
+            self._collection.query, query_embeddings=embedding, n_results=20
         )
         ids = result.get("ids") or []
         return ids[0] if ids else []

@@ -448,7 +448,7 @@ img{ max-width:100%; display:block; }
 .tabbar{ display:none; }
 @media (max-width:1023px){
   .tabbar{
-    display:grid; grid-template-columns:repeat(4,1fr);
+    display:grid; grid-template-columns:repeat(5,1fr);
     position:fixed; bottom:0; left:0; right:0; z-index:var(--z-header);
     background:var(--paper-raised); border-top:1px solid var(--rule);
     padding-bottom:env(safe-area-inset-bottom);
@@ -478,6 +478,184 @@ img[data-fallback]:not([data-loaded="1"]){
   min-height:100%;
 }
 
+/* ============ 问答：左会话列表 + 右对话流 ============ */
+.chat{
+  /* minmax(0,1fr) 而不是 1fr：格子里有横向滚动的 flex 列表，
+     1fr 的 min 是 min-content，会把整列撑破视口 */
+  display:grid; grid-template-columns:minmax(0,1fr); gap:var(--sp-4);
+  padding-top:var(--sp-6);
+  height:calc(100dvh - 300px); min-height:480px;
+}
+@media (min-width:1024px){
+  .chat{ grid-template-columns:264px minmax(0,1fr); gap:var(--sp-5); }
+}
+
+/* 左侧：会话列表 */
+.chat__side{
+  display:flex; flex-direction:column; min-height:0;
+  border:1px solid var(--rule); background:var(--paper-raised);
+}
+.chat__side-head{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2);
+  padding:var(--sp-3) var(--sp-4);
+  border-bottom:1px solid var(--rule-strong);
+}
+.chat__side-title{
+  font-family:var(--sans); font-size:.8125rem; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft);
+}
+.chat__sessions{ flex:1; overflow-y:auto; min-height:0; }
+.chat__session{
+  display:block; width:100%; text-align:left;
+  padding:var(--sp-3) var(--sp-4);
+  border-bottom:1px solid var(--rule); border-left:2px solid transparent;
+  transition:background var(--t-fast) var(--ease-out),
+             border-color var(--t-fast) var(--ease-out);
+}
+.chat__session:hover{ background:var(--paper-sunk); }
+.chat__session[aria-current="true"]{
+  background:var(--vermilion-wash);
+  border-left-color:var(--vermilion);
+}
+.chat__session-title{
+  font-size:.875rem; font-weight:500; color:var(--ink); line-height:1.5;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.chat__session[aria-current="true"] .chat__session-title{ font-weight:700; }
+.chat__session-meta{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2);
+  margin-top:var(--sp-1);
+  font-family:var(--sans); font-size:.6875rem; color:var(--ink-faint);
+  font-variant-numeric:tabular-nums;
+}
+.chat__session-del{
+  color:var(--ink-ghost); padding:0 var(--sp-1); border-radius:2px;
+  transition:color var(--t-fast) var(--ease-out);
+}
+.chat__session-del:hover{ color:var(--danger); }
+.chat__side-foot{
+  padding:var(--sp-2) var(--sp-4);
+  border-top:1px solid var(--rule);
+  font-family:var(--sans); font-size:.6875rem; color:var(--ink-faint);
+}
+
+/* 右侧：对话主区 */
+.chat__main{
+  display:flex; flex-direction:column; min-height:0;
+  border:1px solid var(--rule); background:var(--paper-raised);
+}
+.chat__stream{
+  flex:1; overflow-y:auto; min-height:0;
+  padding:var(--sp-5);
+  display:flex; flex-direction:column; gap:var(--sp-5);
+}
+.chat__stream > .empty{ margin:auto 0; }
+
+.msg{ display:flex; flex-direction:column; gap:var(--sp-2); max-width:100%; }
+.msg__role{
+  font-family:var(--sans); font-size:.6875rem; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint);
+}
+.msg__body{
+  font-size:1rem; line-height:1.85; color:var(--ink);
+  overflow-wrap:anywhere;
+}
+.msg__body p{ margin-bottom:var(--sp-3); }
+.msg__body p:last-child{ margin-bottom:0; }
+
+/* 用户提问：右对齐、实心块，与报纸正文区分开 */
+.msg--user{ align-items:flex-end; }
+.msg--user .msg__body{
+  background:var(--paper-sunk); border:1px solid var(--rule);
+  border-radius:2px; padding:var(--sp-3) var(--sp-4);
+  max-width:min(100%,46ch); font-family:var(--sans); font-size:.9375rem;
+  line-height:1.7; white-space:pre-wrap;
+}
+/* 助手回答：正文排版，衬线体，无气泡 */
+.msg--bot .msg__body{ max-width:70ch; }
+
+.msg__sources{
+  display:flex; flex-direction:column; gap:var(--sp-2);
+  padding-top:var(--sp-3); margin-top:var(--sp-1);
+  border-top:1px solid var(--rule); max-width:70ch;
+}
+.msg__sources-title{
+  font-family:var(--sans); font-size:.6875rem; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint);
+}
+.msg__source{
+  display:flex; align-items:baseline; gap:var(--sp-2);
+  font-family:var(--sans); font-size:.8125rem; color:var(--ink-soft); line-height:1.6;
+}
+.msg__source-num{ color:var(--vermilion); font-weight:700; flex:none; }
+.msg__source a{ color:inherit; text-decoration:underline; text-decoration-color:var(--rule-strong); text-underline-offset:3px; }
+.msg__source a:hover{ color:var(--vermilion); text-decoration-color:var(--vermilion); }
+.msg__source-tag{
+  flex:none; font-size:.625rem; letter-spacing:.06em; color:var(--ink-faint);
+  border:1px solid var(--rule); border-radius:2px; padding:0 4px;
+}
+
+/* 阶段提示：检索在跑的时候让用户知道进度 */
+.chat__stage{
+  display:flex; align-items:center; gap:var(--sp-2);
+  font-family:var(--sans); font-size:.8125rem; color:var(--ink-faint);
+  min-height:20px;
+}
+/* 类选择器给了 display:flex，会盖掉 UA 的 [hidden]{display:none}，必须显式收口 */
+.chat__stage[hidden]{ display:none; }
+.chat__stage-label{ color:var(--ink-soft); }
+.chat__stage[data-ok="false"] .chat__stage-label{ color:var(--danger); }
+.chat__dots{ display:inline-flex; gap:3px; }
+.chat__dots i{
+  width:4px; height:4px; border-radius:50%; background:var(--ink-ghost);
+  animation:dotPulse 1.2s var(--ease-out) infinite;
+}
+.chat__dots i:nth-child(2){ animation-delay:.16s; }
+.chat__dots i:nth-child(3){ animation-delay:.32s; }
+@keyframes dotPulse{ 0%,60%,100%{ opacity:.25; transform:translateY(0); } 30%{ opacity:1; transform:translateY(-2px); } }
+
+/* 输入区：贴住底部 */
+.chat__composer{
+  display:flex; align-items:flex-end; gap:var(--sp-3);
+  padding:var(--sp-3) var(--sp-4);
+  border-top:1px solid var(--rule-strong);
+  background:var(--paper);
+}
+.chat__input{
+  flex:1; min-height:44px; max-height:160px;
+  padding:var(--sp-2) var(--sp-3);
+  font-family:var(--sans); font-size:.9375rem; line-height:1.6; color:var(--ink);
+  background:var(--paper-raised); border:1px solid var(--rule-strong); border-radius:2px;
+  resize:none; overflow-y:auto;
+  transition:border-color var(--t-fast) var(--ease-out);
+}
+.chat__input::placeholder{ color:var(--ink-ghost); }
+.chat__input:hover{ border-color:var(--ink-faint); }
+.chat__input:focus-visible{ border-color:var(--vermilion); outline-offset:0; }
+.chat__send{ flex:none; min-height:44px; }
+.chat__hint{
+  padding:0 var(--sp-4) var(--sp-3);
+  font-family:var(--sans); font-size:.6875rem; color:var(--ink-faint);
+  display:flex; justify-content:space-between; gap:var(--sp-3); flex-wrap:wrap;
+}
+
+/* 移动端：会话列表变成顶部横条，避免多一层抽屉 */
+@media (max-width:1023px){
+  .chat{ height:calc(100dvh - 300px); min-height:420px; gap:var(--sp-3); }
+  .chat__side{ max-height:150px; }
+  .chat__sessions{ display:flex; gap:var(--sp-2); padding:var(--sp-2); overflow-x:auto; overflow-y:hidden; }
+  .chat__session{
+    flex:0 0 auto; max-width:64vw;
+    border:1px solid var(--rule); border-left-width:2px; border-radius:2px;
+    border-bottom:1px solid var(--rule);
+  }
+  .chat__side-foot{ display:none; }
+  .chat__stream{ padding:var(--sp-4); }
+  /* 空状态在窄屏用大内边距会把输入区挤出视口 */
+  .chat__stream > .empty{ padding:var(--sp-5) var(--sp-3); }
+  .chat__composer{ padding:var(--sp-2) var(--sp-3); }
+}
+
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{
     animation-duration:.01ms !important; animation-iteration-count:1 !important;
@@ -485,6 +663,7 @@ img[data-fallback]:not([data-loaded="1"]){
   }
   .entry{ animation:none; }
   .sk{ animation:none; background:var(--paper-sunk); }
+  .chat__dots i{ animation:none; opacity:.6; }
 }
 </style>
 </head>
@@ -549,6 +728,51 @@ img[data-fallback]:not([data-loaded="1"]){
     <!-- 账户视图 -->
     <section class="view" id="v-account">
       <div class="account" id="accountBox"></div>
+    </section>
+
+    <!-- 问答视图：左侧会话列表 + 右侧对话流 + 底部输入区 -->
+    <section class="view" id="v-chat" aria-labelledby="chatTitle">
+      <h2 class="section-head__title" id="chatTitle" style="position:absolute;left:-9999px">
+        新闻问答
+      </h2>
+      <div class="chat">
+        <aside class="chat__side" aria-label="对话历史">
+          <div class="chat__side-head">
+            <span class="chat__side-title">对话历史</span>
+            <button class="btn btn--sm btn--ghost" data-act="new-chat">新对话</button>
+          </div>
+          <div class="chat__sessions" id="chatSessions" role="list"></div>
+          <div class="chat__side-foot" id="chatSideFoot">—</div>
+        </aside>
+
+        <div class="chat__main">
+          <div class="chat__stream" id="chatStream">
+            <div class="empty">
+              <div class="empty__mark">问</div>
+              <div class="empty__title">向今日头条提问</div>
+              <div class="empty__text">
+                基于本地新闻库回答，答不上来时会自动联网检索。
+                左侧可以切换历史对话，每个对话独立保存上下文。
+              </div>
+            </div>
+          </div>
+          <div class="chat__stage" id="chatStage" hidden>
+            <span class="chat__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="chat__stage-label" id="chatStageLabel">正在准备</span>
+          </div>
+          <form class="chat__composer" id="chatForm" autocomplete="off">
+            <label for="chatInput" class="skip">输入问题</label>
+            <textarea class="chat__input" id="chatInput" rows="1"
+              placeholder="问点什么……"
+              maxlength="500" aria-describedby="chatHint"></textarea>
+            <button class="btn btn--primary chat__send" id="chatSend" type="submit">发送</button>
+          </form>
+          <div class="chat__hint" id="chatHint">
+            <span>Enter 发送 · Shift+Enter 换行</span>
+            <span id="chatCount">0 / 500</span>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </div>
@@ -641,7 +865,10 @@ const api = {
   historyAdd:  newsId        => request("/history/add",    { method: "POST", body: { newsId } }),
   historyList: q             => request("/history/list",   { query: q }),
   historyDel:  id            => request(`/history/delete/${id}`, { method: "DELETE" }),
-  historyClear:()            => request("/history/clear",  { method: "DELETE" })
+  historyClear:()            => request("/history/clear",  { method: "DELETE" }),
+  qaSessions:  ()            => request("/qa/sessions"),
+  qaHistory:   id            => request(`/qa/history/${encodeURIComponent(id)}`),
+  qaClear:     id            => request(`/qa/thread/${encodeURIComponent(id)}`, { method: "DELETE" })
 };
 
 /* ============================================================
@@ -685,7 +912,9 @@ const state = {
   collection: { kind: "favorite", page: 1, total: 0 },
   authMode: "login",
   accountTab: "profile",
-  loading: false
+  loading: false,
+  // 问答：threadId 是服务端会话标识，messages 是当前渲染的对话
+  chat: { sessions: [], threadId: "", messages: [], sending: false }
 };
 
 /* ============================================================
@@ -759,17 +988,21 @@ function requireLogin(msg = "登录后即可使用该功能") {
    导航
    ============================================================ */
 function switchView(name) {
-  $$(".view").forEach(v => v.classList.toggle("is-active", v.id === `v-${name}`));
+  // 收藏与历史共用 #v-collection 容器，没有独立的 v-favorite / v-history。
+  // 不做映射的话 go("history") 会匹配不到任何 section，整页变空白。
+  const section = name === "favorite" || name === "history" ? "collection" : name;
+  $$(".view").forEach(v => v.classList.toggle("is-active", v.id === `v-${section}`));
   state.view = name;
+  // 导航条的高亮由 renderCategories 输出，切视图后必须重绘，否则「问答」永远不高亮
+  if (state.categories.length) renderCategories();
   syncNav();
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function syncNav() {
-  $$(".nav__item").forEach(b => {
-    if (b.dataset.view === state.view && b.dataset.view !== "list") b.removeAttribute("aria-current");
-  });
-  const map = { list: "cat", favorite: "fav", history: "his", account: "me" };
+  // 顶部导航的高亮由 renderCategories() 统一输出，这里只管底部 tabbar。
+  // （原来这里会 removeAttribute，把刚画上去的「问答」高亮又擦掉）
+  const map = { list: "cat", chat: "chat", favorite: "fav", history: "his", account: "me" };
   const target = map[state.view];
   $$(".tabbar__btn").forEach(b => b.toggleAttribute("aria-current", b.dataset.view === target));
 }
@@ -781,20 +1014,26 @@ function go(view, opts = {}) {
   if (view === "favorite" || view === "history") loadCollection(view, opts.page || 1);
   if (view === "auth") renderAuth();
   if (view === "account") renderAccount();
+  if (view === "chat") openChat(opts.threadId || "");
 }
 
 function renderCategories() {
   // 后端 /api/news/list 的 categoryId 为必填，没有"全部分类"聚合接口，
   // 因此不渲染会导致误导的"全部"标签，直接列出真实分类
-  $("#cats").innerHTML = state.categories.map(c => `
+  const cats = state.categories.map(c => `
     <button class="nav__item" data-cat="${c.id}"
-      ${c.id === state.categoryId ? 'aria-current="page"' : ""}
+      ${c.id === state.categoryId && state.view === "list" ? 'aria-current="page"' : ""}
     >${esc(c.name)}</button>`).join("");
+  // 问答是常驻入口，跟在分类后面
+  const chat = `<button class="nav__item" data-view="chat"
+    ${state.view === "chat" ? 'aria-current="page"' : ""}>问答</button>`;
+  $("#cats").innerHTML = cats + chat;
 }
 
 function renderTabbar() {
   const items = [
     { view: "list", label: "要闻", icon: '<path d="M4 5h16M4 10h16M4 15h10M4 20h7"/>' },
+    { view: "chat", label: "问答", icon: '<path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/><path d="M9 11h6M9 15h4"/>' },
     { view: "favorite", label: "收藏", icon: '<path d="M6 3h12v18l-6-5-6 5z"/>' },
     { view: "history", label: "历史", icon: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v5l3 2"/>' },
     { view: "account", label: "我的", icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>' }
@@ -1367,6 +1606,250 @@ function renderAuthSlot() {
 }
 
 /* ============================================================
+   问答
+   ============================================================ */
+const CHAT_THREAD_KEY = "toutiao_qa_thread";
+
+function newThreadId() {
+  // 后端 use_memory = bool(thread_id)，所以必须由前端给一个非空 ID 才有上下文
+  const rnd = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`)
+    .replace(/[^a-zA-Z0-9-]/g, "");
+  return `t-${rnd}`.slice(0, 64);
+}
+
+function getThreadId() {
+  return localStorage.getItem(CHAT_THREAD_KEY) || "";
+}
+function setThreadId(id) {
+  if (id) localStorage.setItem(CHAT_THREAD_KEY, id);
+  else localStorage.removeItem(CHAT_THREAD_KEY);
+}
+
+/* 极简排版：段落 + 引用角标，不引入 markdown 库 */
+function answerHTML(text) {
+  const blocks = String(text ?? "").split(/\n{2,}/).filter(b => b.trim());
+  const refs = s => esc(s).replace(/\[(\d+)\]/g,
+    '<span class="msg__source-num">[$1]</span>');
+  if (!blocks.length) return "";
+  return blocks.map(b => `<p>${refs(b).replace(/\n/g, "<br>")}</p>`).join("");
+}
+
+function sourcesHTML(sources) {
+  if (!Array.isArray(sources) || !sources.length) return "";
+  const rows = sources.map((s, i) => {
+    const label = s.title || s.url || "（无标题）";
+    const text = s.url
+      ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`
+      : esc(label);
+    const tag = s.type === "web" ? "网页" : "新闻";
+    return `<div class="msg__source">
+      <span class="msg__source-num">[${i + 1}]</span>
+      <span class="msg__source-tag">${tag}</span>
+      <span>${text}</span>
+    </div>`;
+  }).join("");
+  return `<div class="msg__sources">
+    <span class="msg__sources-title">参考来源</span>${rows}</div>`;
+}
+
+function msgHTML(msg) {
+  const isUser = msg.role === "user";
+  const body = isUser ? esc(msg.content) : answerHTML(msg.content);
+  return `<div class="msg ${isUser ? "msg--user" : "msg--bot"}">
+    <span class="msg__role">${isUser ? "我" : "晨报"}</span>
+    <div class="msg__body">${body || (isUser ? "" : "（未生成内容）")}</div>
+    ${isUser ? "" : sourcesHTML(msg.sources)}
+  </div>`;
+}
+
+function renderChatStream() {
+  const el = $("#chatStream");
+  if (!state.chat.messages.length) {
+    el.innerHTML = `<div class="empty">
+      <div class="empty__mark">问</div>
+      <div class="empty__title">向今日头条提问</div>
+      <div class="empty__text">基于本地新闻库回答，答不上来时会自动联网检索。左侧可以切换历史对话，每个对话独立保存上下文。</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = state.chat.messages.map(msgHTML).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+function appendMessage(msg) {
+  state.chat.messages.push(msg);
+  renderChatStream();
+}
+
+function renderSessions() {
+  const box = $("#chatSessions");
+  const rows = state.chat.sessions;
+  if (!rows.length) {
+    box.innerHTML = `<div class="empty" style="border:0;padding:var(--sp-5) var(--sp-3)">
+      <div class="empty__text" style="margin:0">还没有历史对话</div></div>`;
+    return;
+  }
+  box.innerHTML = rows.map(s => `
+    <div class="chat__session" role="listitem" data-thread="${esc(s.thread_id)}"
+         aria-current="${s.thread_id === state.chat.threadId}">
+      <button class="chat__session-title" data-open-thread="${esc(s.thread_id)}"
+              style="text-align:left;width:100%">${esc(s.title || s.thread_id)}</button>
+      <div class="chat__session-meta">
+        <span>${esc(fmtRelative(s.updated_at) || "—")}</span>
+        <button class="chat__session-del" data-del-thread="${esc(s.thread_id)}"
+                title="删除这个对话" aria-label="删除对话">✕</button>
+      </div>
+    </div>`).join("");
+  const n = rows.length;
+  $("#chatSideFoot").textContent = `共 ${n} 个对话 · 存在服务端 checkpointer 里`;
+}
+
+async function loadChatSessions() {
+  try {
+    const data = await api.qaSessions();
+    state.chat.sessions = data?.sessions || [];
+  } catch {
+    state.chat.sessions = [];
+  }
+  renderSessions();
+}
+
+async function openChat(threadId) {
+  const id = threadId || getThreadId();
+  state.chat.threadId = id;
+  state.chat.messages = [];
+  renderChatStream();
+  await loadChatSessions();
+
+  if (!id) return;
+  try {
+    const data = await api.qaHistory(id);
+    state.chat.messages = (data?.messages || []).map(m => ({
+      role: m.role, content: m.content || ""
+    }));
+    renderChatStream();
+  } catch (err) {
+    // 会话不存在时不该弹错，直接从空白开始
+    state.chat.messages = [];
+    renderChatStream();
+  }
+}
+
+function setStage(text, ok = true) {
+  const el = $("#chatStage");
+  if (!text) { el.hidden = true; return; }
+  el.hidden = false;
+  el.dataset.ok = String(ok);
+  $("#chatStageLabel").textContent = text;
+}
+
+/* SSE 消费：POST 请求，所以不能用原生 EventSource */
+async function streamAsk(question, threadId, handlers) {
+  const res = await fetch(`${API}/qa/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, threadId })
+  });
+  if (!res.ok || !res.body) {
+    throw new ApiError(`问答服务返回 HTTP ${res.status}`, res.status, res.status);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  // fastapi.sse 用 \n\n 分帧，sse-starlette 用 \r\n\r\n，两种都要认
+  const SEP = /\r\n\r\n|\n\n/;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+
+    let idx;
+    while ((idx = buf.search(SEP)) >= 0) {
+      const block = buf.slice(0, idx);
+      buf = buf.slice(idx).replace(SEP, "");
+      if (!block.trim()) continue;
+
+      let event = "message";
+      const dataLines = [];
+      for (const line of block.split(/\r?\n/)) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+        // 以 ":" 开头的是注释心跳，忽略
+      }
+      if (!dataLines.length) continue;
+
+      let data;
+      try { data = JSON.parse(dataLines.join("\n")); }
+      catch { continue; }
+      handlers(event, data);
+    }
+  }
+}
+
+async function sendQuestion(text) {
+  const question = String(text || "").trim();
+  if (!question || state.chat.sending) return;
+
+  if (!state.chat.threadId) {
+    state.chat.threadId = newThreadId();
+    setThreadId(state.chat.threadId);
+  }
+  const threadId = state.chat.threadId;
+
+  state.chat.sending = true;
+  $("#chatSend").disabled = true;
+
+  appendMessage({ role: "user", content: question });
+  const bot = { role: "assistant", content: "", sources: [] };
+  state.chat.messages.push(bot);
+  const stream = $("#chatStream");
+  stream.insertAdjacentHTML("beforeend", msgHTML(bot));
+  stream.scrollTop = stream.scrollHeight;
+  const botBody = stream.lastElementChild.querySelector(".msg__body");
+  const botBox = stream.lastElementChild;
+
+  setStage("正在理解问题");
+
+  try {
+    await streamAsk(question, threadId, (event, data) => {
+      if (event === "answer_token") {
+        bot.content += data.text || "";
+        botBody.innerHTML = answerHTML(bot.content) || "";
+      } else if (event === "node") {
+        const label = data.model || data.node || "处理中";
+        setStage(`已完成：${label}${data.ms ? ` · ${Math.round(data.ms)}ms` : ""}`, data.ok !== false);
+      } else if (event === "done") {
+        bot.content = data.answer || bot.content;
+        bot.sources = data.sources || [];
+        botBody.innerHTML = answerHTML(bot.content) || "（未生成内容）";
+        botBox.insertAdjacentHTML("beforeend", sourcesHTML(bot.sources));
+        if (data.status && data.status !== "ok") {
+          setStage(data.status === "degraded" ? "已降级作答" : "作答失败", data.status === "degraded");
+        } else {
+          setStage("");
+        }
+      } else if (event === "error") {
+        setStage(data.message || "服务出错", false);
+        toast(data.message || "问答服务出错", "error");
+      }
+    });
+  } catch (err) {
+    bot.content = bot.content || "";
+    botBody.innerHTML = answerHTML(bot.content) || `<span style="color:var(--danger)">${esc(err.message)}</span>`;
+    setStage(err.message, false);
+    toast(err.message, "error");
+  } finally {
+    state.chat.sending = false;
+    $("#chatSend").disabled = false;
+    stream.scrollTop = stream.scrollHeight;
+    // 本轮结束后刷新左侧列表，标题与时间才会更新
+    loadChatSessions();
+  }
+}
+
+/* ============================================================
    事件绑定（统一委托）
    ============================================================ */
 document.addEventListener("click", async e => {
@@ -1414,6 +1897,45 @@ document.addEventListener("click", async e => {
   const navBtn = t.closest("[data-view]");
   if (navBtn) { go(navBtn.dataset.view); return; }
 
+  // 问答：删除会话（必须先于「打开会话」判断，删除按钮在行内）
+  const delThread = t.closest("[data-del-thread]");
+  if (delThread) {
+    const id = delThread.dataset.delThread;
+    if (!confirm("确定删除这个对话吗？删除后无法恢复。")) return;
+    try {
+      await api.qaClear(id);
+      if (state.chat.threadId === id) {
+        state.chat.threadId = "";
+        state.chat.messages = [];
+        setThreadId("");
+        renderChatStream();
+      }
+      toast("对话已删除", "success");
+      loadChatSessions();
+    } catch (err) { toast(err.message, "error"); }
+    return;
+  }
+
+  // 问答：切换会话
+  const openThread = t.closest("[data-open-thread]");
+  if (openThread) {
+    const id = openThread.dataset.openThread;
+    setThreadId(id);
+    openChat(id);
+    return;
+  }
+  if (t.closest('[data-act="new-chat"]')) {
+    const wasChat = state.view === "chat";
+    state.chat.threadId = "";
+    state.chat.messages = [];
+    setThreadId("");
+    renderChatStream();
+    setStage("");
+    if (!wasChat) go("chat");
+    $("#chatInput")?.focus();
+    return;
+  }
+
   // 账户 tab
   const tabBtn = t.closest("[data-tab]");
   if (tabBtn) { state.accountTab = tabBtn.dataset.tab; renderAccount(); return; }
@@ -1450,6 +1972,17 @@ document.addEventListener("click", async e => {
 // 表单提交
 document.addEventListener("submit", async e => {
   const f = e.target;
+
+  if (f.id === "chatForm") {
+    e.preventDefault();
+    const input = $("#chatInput");
+    const text = input.value;
+    input.value = "";
+    autoGrow(input);
+    $("#chatCount").textContent = "0 / 500";
+    sendQuestion(text);
+    return;
+  }
 
   if (f.id === "authForm") {
     e.preventDefault();
@@ -1515,6 +2048,27 @@ document.addEventListener("blur", e => {
   }
 }, true);
 
+/* 问答输入框：自动增高 + 字数统计 + Enter 发送 */
+function autoGrow(el) {
+  el.style.height = "auto";
+  el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+}
+
+document.addEventListener("input", e => {
+  if (e.target.id !== "chatInput") return;
+  autoGrow(e.target);
+  $("#chatCount").textContent = `${e.target.value.length} / 500`;
+});
+
+document.addEventListener("keydown", e => {
+  if (e.target.id !== "chatInput") return;
+  // Shift+Enter 换行，Enter 直接发送；输入法组字期间不能拦截
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    $("#chatForm").requestSubmit();
+  }
+});
+
 /* ============================================================
    图片降级：外链图片加载失败时替换为排版占位块
    ============================================================ */
@@ -1561,6 +2115,7 @@ function route() {
   const [seg, arg] = hash.split("/");
 
   if (seg === "detail" && arg) { switchView("detail"); loadDetail(Number(arg)); return; }
+  if (seg === "chat") { go("chat", { threadId: arg ? decodeURIComponent(arg) : "" }); return; }
   if (seg === "favorite") { go("favorite"); return; }
   if (seg === "history") { go("history"); return; }
   if (seg === "account") { go("account"); return; }

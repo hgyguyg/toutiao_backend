@@ -21,13 +21,9 @@ class QAState(TypedDict, total=False):
     web_hits: list[dict]  # [{"title","url","snippet"}]
 
     # 模块三
-    kb_hits: list[dict]  # [{"id","text","title","news_id","url","score"}]
+    kb_hits: list[dict]  # [{"id","text","title","news_id","url","score","publish_time","chunk_ids","category_id"}]
 
     # 模块四
-    extracted: list[dict]  # [{"point": str, "ref": int}]
-    extract_relevant: bool
-
-    # 模块五
     sufficient: bool
     judge_reason: str
 
@@ -47,12 +43,10 @@ class QAState(TypedDict, total=False):
 def initial_state(
     question: str,
     history: list[dict] | None = None,
-    top_k: int = 6,
     thread_id: str = "",
 ) -> dict:
     state: dict = {
         "question": question,
-        "top_k": top_k,
         "thread_id": thread_id,
         # ---- 瞬时字段：必须显式清零，否则上一轮的结果会串进本轮 ----
         "rewritten": "",
@@ -60,8 +54,6 @@ def initial_state(
         "intent_reason": "",
         "web_hits": [],
         "kb_hits": [],
-        "extracted": [],
-        "extract_relevant": False,
         "sufficient": False,
         "judge_reason": "",
         "answer": "",

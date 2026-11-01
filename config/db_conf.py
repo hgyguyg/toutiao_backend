@@ -3,6 +3,8 @@ import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 SQL_PASSWORD = os.getenv("DATABASE_PASSWORD")
+if not os.getenv("DATABASE_PASSWORD"):
+    raise RuntimeError("缺少 DATABASE_PASSWORD 环境变量")
 DATABASE_URL = f"mysql+aiomysql://root:{SQL_PASSWORD}@localhost:3306/news_app?charset=utf8mb4"
 
 async_engine = create_async_engine(

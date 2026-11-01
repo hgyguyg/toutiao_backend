@@ -48,6 +48,18 @@ pip-wheel-metadata/
 *.db
 dump.sql
 
+# ---------- SQLite 运行时产物（WAL / SHM 含真实对话内容，禁止入库）----------
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+data/
+
+# ---------- 索引产物（由 utils/build_index 重新生成，勿入库）----------
+index_data/
+
+# ---------- 本地审计/进度报告 ----------
+PROGRESS_*.md
+
 # ---------- 操作系统 ----------
 .DS_Store
 Thumbs.db

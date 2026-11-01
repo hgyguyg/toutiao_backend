@@ -3,7 +3,7 @@ from json import JSONDecoder, JSONDecodeError
 
 from openai import AsyncOpenAI
 
-from config.qa_conf import OPENAI_API_KEY, BASE_URL
+from config.qa_conf import OPENAI_API_KEY, BASE_URL, CHAT_MODEL
 
 _client = None
 
@@ -50,10 +50,10 @@ async def chat(prompt,system=None,temperature = 0.0):
             {"role": "system", "content": system or SYSTEM_PROMPT},
             {"role": "user", "content": prompt}
         ],
-        model="qwen3-max",
+        model=CHAT_MODEL,
         temperature=temperature,
     )
-    return (response.choices[0].message.content).strip()
+    return (response.choices[0].message.content or "").strip()
 
 async def chat_json(prompt,system=None,temperature = 0.0):
     messages = [
@@ -63,7 +63,7 @@ async def chat_json(prompt,system=None,temperature = 0.0):
     for use_json_mode in [True,False]:
         try:
             kwargs = {
-                "model": "qwen3-max",
+                "model": CHAT_MODEL,
                 "messages": messages,
                 "temperature": temperature,
             }
@@ -85,7 +85,7 @@ async def chat_stream(prompt,system=None,temperature = 0.0,on_token = None):
     ]
     stream = await get_client().chat.completions.create(
         messages=messages,
-        model="qwen3-max",
+        model=CHAT_MODEL,
         temperature=temperature,
         stream=True
     )
