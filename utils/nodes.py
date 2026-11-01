@@ -4,6 +4,9 @@ from functools import wraps
 from langgraph.config import get_stream_writer
 from langgraph.errors import GraphBubbleUp
 
+from utils import llm
+from utils.llm import chat_stream
+
 MODULE_LABEL = {
     "rewrite": "模块一·问题改写",
     "classify": "模块二·分类路由",
@@ -24,7 +27,16 @@ def _emit(payload: dict) -> None:
     except Exception:  # noqa: BLE001 - 流式出口绝不能影响主流程
         pass
 
+def _token_emitter(event_type: str = "token"):
+    """返回一个 on_token 回调，把增量文本包装成自定义事件。"""
+
+    def on_token(text: str) -> None:
+        _emit({"type": event_type, "text": text})
+
+    return on_token
+
 def _node(name):
+    """返回一个节点装饰器，用于包装节点函数。"""
     label = MODULE_LABEL.get(name,name)
     def deco(fn):
         @wraps(fn)
@@ -50,7 +62,7 @@ def _node(name):
             except Exception as e:
                 ms = int((time.perf_counter() - start) * 1000)
                 entry = {
-                    "module": label,
+                    "model": label,
                     "node": name,
                     "ok": False,
                     "ms": ms,
@@ -65,3 +77,83 @@ def _node(name):
         return wrapper
     return deco
 
+@_node("rewrite")
+async def node_rewrite(state):
+    """对用户问题进行改写，使其更适合检索。"""
+    history = state.get("history") or []
+    question = state.get("question","").strip()
+
+    lines = []
+    for msg in history[-6:]:
+        role = "用户" if msg.get("role") == "user" else "助手"
+        lines.append(f"{role}: {msg.get('content', '')}")
+    prompt = (
+        "你是新闻平台的问答助手。请结合对话历史，把用户最新问题改写成一个独立、完整、"
+        "适合检索的问题：补全省略的主语和指代，但不要改变原意、不要添加用户没问的内容。\n\n"
+        "对话历史：\n" + "\n".join(lines) + f"\n\n最新问题：{question}\n\n"
+        "只输出改写后的问题本身，不要解释。"
+    )
+    rewrite = (await llm.chat(prompt) or question).strip()
+    return {
+        "rewritten": rewrite,
+        "_detail": f"改写为：{rewrite[:80]}"
+    }
+
+@_node("classify")
+async def node_classify(state):
+    """根据意图判断，决定问题的处理路径。"""
+    question = state.get("rewritten") or state.get("question")
+    prompt = (
+        "你是新闻平台问答系统的路由器，只判断问题应该走哪条路径。\n"
+        "路径定义：\n"
+        "- direct：闲聊、通用常识，或仅凭对话历史即可回答，不需要检索新闻库、也不需要联网。\n"
+        "- web：明确需要「此刻/今天」的实时信息（今天的新闻、天气、比分、股价、汇率），"
+        "或站内新闻库几乎不可能覆盖的内容。\n"
+        "- kb：问题与新闻事件、新闻中出现的人物/政策/产品/数据有关（包括历史事件），"
+        "站内新闻库可以回答。\n\n"
+        "判断原则：只要问题的答案可能存在于新闻库里，就选 kb；只有确实需要实时信息时才选 web。\n\n"
+        "示例：\n"
+        "- 「2023年我国GDP增长了多少」→ kb（站内新闻有该新闻）\n"
+        "- 「美联储最近一次加息是什么时候」→ kb（新闻库覆盖）\n"
+        "- 「今天天气怎么样」→ web（实时信息）\n"
+        "- 「你好，你能做什么」→ direct（闲聊，无需检索）\n"
+        "- 「刚才那条新闻具体讲了什么」→ kb（结合对话历史，站内新闻）\n\n"
+        f"待判断问题：{question}\n\n"
+        '只输出 JSON，格式：{"intent": "direct|web|kb", "reason": "一句话理由"}'
+    )
+    data = await llm.chat_json(prompt)
+    intent = data.get("intent","").lower().strip()
+    if intent not in {"kb","web","direct"}:
+        intent = "kb"
+    return {
+        "intent": intent,
+        "intent_reason": data.get("reason",""),
+        "_detail": f"意图：{intent}, 原因：{data.get('reason','')}"
+    }
+
+@_node("direct_answer")
+async def node_direct_answer(state):
+    """直接回答问题，不需要检索。"""
+    question = state.get("rewritten") or state.get("question")
+    history = state.get("history") or []
+    history_block = ""
+    if history:
+        lines = []
+        for msg in history[-6:]:
+            role = "用户" if msg.get("role") == "user" else "助手"
+            lines.append(f"{role}: {msg.get('content', '')}")
+        history_block = "\n".join(lines)
+    prompt = (f"对话历史：{history_block}"
+              f"用户问题：{question}"
+              f"请直接回答。如果信息不足或不确定，请明确说明，不要编造。")
+    answer = await chat_stream(prompt=prompt,on_token=_token_emitter("answer_token"))
+    return {
+        "answer": answer,
+        "sources":[],
+        "_detail": "直接作答",
+        "route": "direct"
+    }
+
+@_node("kb_retrieve")
+async def node_kb_retrieve(state):
+    """根据问题，从知识库中检索相关文档。"""
