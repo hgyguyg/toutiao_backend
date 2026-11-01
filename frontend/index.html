@@ -538,6 +538,13 @@ img[data-fallback]:not([data-loaded="1"]){
   border-top:1px solid var(--rule);
   font-family:var(--sans); font-size:.6875rem; color:var(--ink-faint);
 }
+/* 未登录：会话列表整块换成引导，不留空壳 */
+.chat__gate{
+  padding:var(--sp-4);
+  display:flex; flex-direction:column; gap:var(--sp-3);
+  font-family:var(--sans); font-size:.8125rem; color:var(--ink-soft); line-height:1.7;
+}
+.chat__gate .btn{ align-self:flex-start; }
 
 /* 右侧：对话主区 */
 .chat__main{
@@ -1482,6 +1489,10 @@ async function submitAuth(form) {
     renderAuthSlot();
     toast(state.authMode === "login" ? "登录成功" : "注册成功", "success");
     await refreshFavIds();
+    // 会话列表按账号隔离，登录后必须重新拉一次，否则还是上一个账号/未登录的视图
+    setThreadId("");
+    state.chat.threadId = "";
+    state.chat.messages = [];
     go(state.user ? "account" : "list");
   } catch (e) {
     // 后端错误语义：用户名已存在 / 用户名或密码错误
@@ -1610,13 +1621,8 @@ function renderAuthSlot() {
    ============================================================ */
 const CHAT_THREAD_KEY = "toutiao_qa_thread";
 
-function newThreadId() {
-  // 后端 use_memory = bool(thread_id)，所以必须由前端给一个非空 ID 才有上下文
-  const rnd = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`)
-    .replace(/[^a-zA-Z0-9-]/g, "");
-  return `t-${rnd}`.slice(0, 64);
-}
-
+/* 会话 id 由服务端生成（u<用户id>-<16位hex>）并随 meta 事件回传。
+   前端不再自己造 id：自己造的话服务端无法判断归属，只能拒绝。 */
 function getThreadId() {
   return localStorage.getItem(CHAT_THREAD_KEY) || "";
 }
@@ -1683,10 +1689,22 @@ function appendMessage(msg) {
 
 function renderSessions() {
   const box = $("#chatSessions");
+
+  // 会话存在服务端并与账号绑定，未登录时列表必然是空的，直接给登录引导
+  if (!state.user) {
+    box.innerHTML = `<div class="chat__gate">
+      <p>对话保存在服务端并归属你的账号，登录后才能查看历史。</p>
+      <button class="btn btn--sm btn--primary" data-view="auth">去登录</button>
+    </div>`;
+    $("#chatSideFoot").textContent = "未登录";
+    return;
+  }
+
   const rows = state.chat.sessions;
   if (!rows.length) {
     box.innerHTML = `<div class="empty" style="border:0;padding:var(--sp-5) var(--sp-3)">
       <div class="empty__text" style="margin:0">还没有历史对话</div></div>`;
+    $("#chatSideFoot").textContent = "共 0 个对话";
     return;
   }
   box.innerHTML = rows.map(s => `
@@ -1705,6 +1723,12 @@ function renderSessions() {
 }
 
 async function loadChatSessions() {
+  // 这些接口都要登录，未登录直接渲染引导，不要白打一次 401
+  if (!state.user) {
+    state.chat.sessions = [];
+    renderSessions();
+    return;
+  }
   try {
     const data = await api.qaSessions();
     state.chat.sessions = data?.sessions || [];
@@ -1721,7 +1745,7 @@ async function openChat(threadId) {
   renderChatStream();
   await loadChatSessions();
 
-  if (!id) return;
+  if (!id || !state.user) return;
   try {
     const data = await api.qaHistory(id);
     state.chat.messages = (data?.messages || []).map(m => ({
@@ -1729,7 +1753,8 @@ async function openChat(threadId) {
     }));
     renderChatStream();
   } catch (err) {
-    // 会话不存在时不该弹错，直接从空白开始
+    // 会话不属于当前账号或已被删除时返回 404，清掉本地指针后从空白开始
+    if (err.code === 404) setThreadId("");
     state.chat.messages = [];
     renderChatStream();
   }
@@ -1745,11 +1770,21 @@ function setStage(text, ok = true) {
 
 /* SSE 消费：POST 请求，所以不能用原生 EventSource */
 async function streamAsk(question, threadId, handlers) {
-  const res = await fetch(`${API}/qa/ask`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, threadId })
-  });
+  const headers = { "Content-Type": "application/json" };
+  const token = getToken();
+  // /ask 现在要鉴权，裸 fetch 不会自动带上令牌
+  if (token) headers.authorization = `Bearer ${token}`;
+  // 空串不要发：不传 threadId 时由服务端新建会话，传空串会被当成「用别人的空线程」
+  const body = threadId ? { question, threadId } : { question };
+
+  const res = await fetch(`${API}/qa/ask`, { method: "POST", headers, body: JSON.stringify(body) });
+
+  if (res.status === 401) {
+    setToken("");
+    state.user = null;
+    renderAuthSlot();
+    throw new ApiError("登录已过期，请重新登录", 401, 401);
+  }
   if (!res.ok || !res.body) {
     throw new ApiError(`问答服务返回 HTTP ${res.status}`, res.status, res.status);
   }
@@ -1792,11 +1827,15 @@ async function sendQuestion(text) {
   const question = String(text || "").trim();
   if (!question || state.chat.sending) return;
 
-  if (!state.chat.threadId) {
-    state.chat.threadId = newThreadId();
-    setThreadId(state.chat.threadId);
+  // 会话归属账号，必须先登录；否则服务端没有可用的 thread_id
+  if (!state.user) {
+    toast("登录后即可提问并保存对话", "info");
+    go("auth");
+    return;
   }
-  const threadId = state.chat.threadId;
+
+  // 首轮不传 threadId，等服务端在 meta 事件里回传新建的会话 id
+  const threadId = state.chat.threadId || "";
 
   state.chat.sending = true;
   $("#chatSend").disabled = true;
@@ -1814,13 +1853,25 @@ async function sendQuestion(text) {
 
   try {
     await streamAsk(question, threadId, (event, data) => {
-      if (event === "answer_token") {
+      if (event === "meta") {
+        // 服务端回传真正生效的会话 id（新建时就是这里拿到的），存下来供下一轮与刷新恢复
+        if (data.thread_id) {
+          state.chat.threadId = data.thread_id;
+          setThreadId(data.thread_id);
+          // replaceState 同步地址栏，刷新才能回到这个新会话；不改 location.hash 以免再触发一次 route
+          history.replaceState(null, "", `#/chat/${encodeURIComponent(data.thread_id)}`);
+        }
+      } else if (event === "answer_token") {
         bot.content += data.text || "";
         botBody.innerHTML = answerHTML(bot.content) || "";
       } else if (event === "node") {
         const label = data.model || data.node || "处理中";
         setStage(`已完成：${label}${data.ms ? ` · ${Math.round(data.ms)}ms` : ""}`, data.ok !== false);
       } else if (event === "done") {
+        if (data.thread_id) {
+          state.chat.threadId = data.thread_id;
+          setThreadId(data.thread_id);
+        }
         bot.content = data.answer || bot.content;
         bot.sources = data.sources || [];
         botBody.innerHTML = answerHTML(bot.content) || "（未生成内容）";
@@ -1896,7 +1947,6 @@ document.addEventListener("click", async e => {
   // 视图切换
   const navBtn = t.closest("[data-view]");
   if (navBtn) { go(navBtn.dataset.view); return; }
-
   // 问答：删除会话（必须先于「打开会话」判断，删除按钮在行内）
   const delThread = t.closest("[data-del-thread]");
   if (delThread) {
@@ -1921,7 +1971,10 @@ document.addEventListener("click", async e => {
   if (openThread) {
     const id = openThread.dataset.openThread;
     setThreadId(id);
-    openChat(id);
+    // 走 hash 而不是直接 openChat：刷新后才能回到同一个会话。
+    // hash 已经是目标值时不会触发 hashchange，得手动开一次。
+    const target = `#/chat/${encodeURIComponent(id)}`;
+    if (location.hash === target) { openChat(id); } else { location.hash = target; }
     return;
   }
   if (t.closest('[data-act="new-chat"]')) {
@@ -1929,6 +1982,8 @@ document.addEventListener("click", async e => {
     state.chat.threadId = "";
     state.chat.messages = [];
     setThreadId("");
+    // replaceState 而不是改 location.hash：避免多触发一次 hashchange 把刚清空的会话又拉回来
+    history.replaceState(null, "", "#/chat");
     renderChatStream();
     setStage("");
     if (!wasChat) go("chat");
@@ -1949,6 +2004,11 @@ document.addEventListener("click", async e => {
   if (act === "go-auth") { go("auth"); return; }
   if (act === "logout") {
     setToken(""); state.user = null; state.favIds.clear();
+    // 会话归属账号，退出后必须丢掉本地指针，否则下一个登录的人会看到上一个账号的会话 id
+    setThreadId("");
+    state.chat.threadId = "";
+    state.chat.messages = [];
+    state.chat.sessions = [];
     renderAuthSlot(); toast("已退出登录", "success");
     go("list"); return;
   }

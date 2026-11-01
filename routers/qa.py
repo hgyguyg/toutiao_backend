@@ -1,9 +1,13 @@
 import json
+import uuid
 
 from fastapi import APIRouter, HTTPException
+from fastapi.params import Depends
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
+from models.users import User
 from schemas.qa import AskRequest
+from utils.auth import get_current_user
 from utils.response import success_response
 from utils.retriever import HybridRetriever
 from utils.graph import get_checkpointer, answer_question, get_graph
@@ -13,6 +17,21 @@ router = APIRouter(prefix="/api/qa", tags=["qa"])
 # 回放一个会话时最多往回翻多少个 checkpoint（一轮问答会产生多条快照）
 MAX_REPLAY_CHECKPOINTS = 120
 
+def _new_thread_id(user: User) -> str:
+    """服务端生成会话 id，强制带用户前缀。
+
+    用前缀而不是新建会话表：checkpointer 只有 checkpoints 一张表，
+    加前缀就能在 SQL 层按用户隔离，不用做数据库迁移。
+    """
+    return f"u{user.id}-{uuid.uuid4().hex[:16]}"
+
+
+def _owned_thread(thread_id: str, user: User) -> str:
+    """校验 thread_id 属于当前用户；不属于就当不存在，避免被用来探测别人的 id。"""
+    prefix = f"u{user.id}-"
+    if not thread_id or not thread_id.startswith(prefix) or len(thread_id) > 64:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return thread_id
 
 def _decode_checkpoint(saver, type_: str, blob: bytes) -> dict:
     """把一行 msgpack 解成 dict。解不开就返回空，不让一条脏数据拖垮整个列表。"""
@@ -64,7 +83,7 @@ async def health_check():
 
 
 @router.post("/ask", response_class=EventSourceResponse)
-async def ask(req: AskRequest):
+async def ask(req: AskRequest, user: User = Depends(get_current_user)):
     # ChatMessage 是 pydantic 对象，下游 nodes 用 msg.get("role") 读，
     # 必须先 model_dump 成 dict，否则一轮对话就会降级成 'ChatMessage' object has no attribute 'get'
     history = (
@@ -73,6 +92,10 @@ async def ask(req: AskRequest):
         else None
     )
     thread_id = req.thread_id or ""
+    if thread_id:
+        _owned_thread(thread_id, user)
+    else:
+        thread_id = _new_thread_id(user)
 
     try:
         async for event, data in answer_question(
@@ -92,12 +115,13 @@ async def ask(req: AskRequest):
 
 
 @router.get("/sessions")
-async def qa_sessions(limit: int = 50):
+async def qa_sessions(limit: int = 50, user: User = Depends(get_current_user)):
     """左侧会话列表：thread_id + 首问标题 + 最后活动时间。
 
     checkpointer 只存 checkpoint，没有“会话表”，所以会话列表直接从 checkpoints 里算。
     checkpoint_id 是 UUIDv7，字典序就是时间序，ORDER BY 它即“最后活动时间倒序”。
     """
+    prefix = f"u{user.id}-%"
     saver = get_checkpointer()
     conn = getattr(saver, "conn", None) if saver is not None else None
     if conn is None:
@@ -112,9 +136,9 @@ async def qa_sessions(limit: int = 50):
             cur = await conn.execute(
                 "SELECT thread_id, COUNT(*) AS n, MAX(checkpoint_id) AS cid "
                 "FROM checkpoints "
-                "WHERE thread_id != '' AND checkpoint_ns = '' "
+                "WHERE thread_id LIKE ? AND checkpoint_ns = '' "
                 "GROUP BY thread_id ORDER BY cid DESC LIMIT ?",
-                (limit,),
+                (prefix, limit),
             )
             rows = await cur.fetchall()
 
@@ -161,7 +185,8 @@ async def qa_sessions(limit: int = 50):
 
 
 @router.get("/history/{thread_id}")
-async def qa_history(thread_id: str):
+async def qa_history(thread_id: str, user: User = Depends(get_current_user)):
+    _owned_thread(thread_id, user)
     cfg = {"configurable": {"thread_id": thread_id}}
     try:
         snapshot = await get_graph().aget_state(cfg)
@@ -210,7 +235,8 @@ async def qa_history(thread_id: str):
 
 
 @router.delete("/thread/{thread_id}")
-async def qa_clear_thread(thread_id: str):
+async def qa_clear_thread(thread_id: str, user: User = Depends(get_current_user)):
+    _owned_thread(thread_id, user)
     saver = get_checkpointer()
     if saver is None:
         return success_response("会话记忆未启用", {"thread_id": thread_id, "cleared": False})

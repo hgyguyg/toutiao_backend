@@ -7,15 +7,17 @@ from utils import nodes
 from utils.state import QAState, initial_state
 
 _checkpointer = None
-graph = None
+_graph = None        # 带 checkpointer 的编译结果（多轮会话）
+_graph_plain = None  # 无 checkpointer 的编译结果（一次性问答，绝不写盘）
 _graph_lock = threading.Lock()
 
 def set_checkpointer(saver) -> None:
-    """注入 / 解除 checkpointer（由 main.py 的 lifespan 调用），并强制重编译图。"""
-    global _checkpointer, graph
+    """注入 / 解除 checkpointer（由 main.py 的 lifespan 调用），并强制重编译两份图。"""
+    global _checkpointer, _graph, _graph_plain
     _checkpointer = saver
     with _graph_lock:
-        graph = None
+        _graph = None
+        _graph_plain = None
 
 def get_checkpointer():
     return _checkpointer
@@ -67,13 +69,29 @@ def build_graph(checkpointer=None):
 def _config(thread_id: str):
     return {"configurable": {"thread_id": thread_id}, "recursion_limit": 30}
 
-def get_graph():
-    global graph
-    if graph is None:
+def get_graph(with_memory: bool = True):
+    """带记忆版 / 无记忆版各缓存一个编译结果。
+
+    无记忆版必须是真的不挂 checkpointer：只把 use_memory 当开关而不换图，
+    LangGraph 依然会把这一轮写进 thread_id 指向的线程，匿名请求会互相串话。
+    """
+    global _graph, _graph_plain
+    if with_memory:
+        if _graph is None:
+            with _graph_lock:
+                if _graph is None:
+                    _graph = build_graph(_checkpointer)
+        return _graph
+    if _graph_plain is None:
         with _graph_lock:
-            if graph is None:
-                graph = build_graph(checkpointer=_checkpointer)
-    return graph
+            if _graph_plain is None:
+                _graph_plain = build_graph(None)
+    return _graph_plain
+
+
+def get_plain_graph():
+    """无 checkpointer 的图：一次性问答用它，绝不产生 checkpoint。"""
+    return get_graph(with_memory=False)
 
 def _result(values: dict, question: str) -> dict:
     answer = values.get("answer", "")
@@ -102,8 +120,8 @@ async def answer_question(
     """
     use_memory = bool(thread_id) and get_checkpointer() is not None
     state = initial_state(question, history, thread_id)
-    config = _config(thread_id)
-    graph = get_graph()
+    config = _config(thread_id) if use_memory else {"recursion_limit": 30}
+    graph = get_graph() if use_memory else get_plain_graph()
 
     yield "meta", {"thread_id": thread_id, "question": question}
 
